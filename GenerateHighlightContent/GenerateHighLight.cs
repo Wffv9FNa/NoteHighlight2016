@@ -52,24 +52,33 @@ namespace GenerateHighlightContent
             string inputFileName = Path.Combine(tempPath, FileName);
             string outputFileName = Path.Combine(tempPath, FileName) + ".html";
 
-            File.WriteAllText(inputFileName, Content, Encoding.UTF8);
-
             if (_section == null)
                 throw new FileNotFoundException("ConfigurationManager.GetSection(\"HighLightSection\") failed!");
-            var workingDirectory = Path.Combine(ProcessHelper.GetDirectoryFromPath(Assembly.GetCallingAssembly().Location), _section.FolderName);
 
-            ProcessHelper helper = new ProcessHelper(workingDirectory, _section.ProcessName);
-            helper.Arguments = GenerateArguments(inputFileName, outputFileName);
-            helper.IsWaitForInputIdle = false;
-            helper.WindowStyle = ProcessWindowStyle.Hidden;
+            File.WriteAllText(inputFileName, Content, Encoding.UTF8);
+            try
+            {
+                var workingDirectory = Path.Combine(ProcessHelper.GetDirectoryFromPath(Assembly.GetCallingAssembly().Location), _section.FolderName);
 
-            helper.ProcessStart();
+                ProcessHelper helper = new ProcessHelper(workingDirectory, _section.ProcessName);
+                helper.Arguments = GenerateArguments(inputFileName, outputFileName);
+                helper.IsWaitForInputIdle = false;
+                helper.WindowStyle = ProcessWindowStyle.Hidden;
 
-            if (!File.Exists(outputFileName))
-                throw new FileNotFoundException("Can not find outputFile.");
+                helper.ProcessStart();
 
-            File.Delete(inputFileName);
-            return outputFileName;
+                if (!File.Exists(outputFileName))
+                    throw new FileNotFoundException("Can not find outputFile.");
+
+                return outputFileName;
+            }
+            finally
+            {
+                // Always remove the input scratch file, even when highlight.exe fails to
+                // produce output. Otherwise the user's raw source code is left in %TEMP%
+                // indefinitely on every error path.
+                try { if (File.Exists(inputFileName)) File.Delete(inputFileName); } catch { }
+            }
         }
 
         /// <summary> 初始化參數 </summary>
