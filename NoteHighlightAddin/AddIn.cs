@@ -42,9 +42,24 @@ namespace NoteHighlightAddin
 
         public XNamespace ns;
 
-        private MainForm mainForm;
+        // Worker infrastructure. Ribbon callbacks are serialised by Office onto the main UI thread,
+        // so plain null-checks are sufficient for lazy construction - no lock, no Lazy<T>, no
+        // double-checked locking. See plan section 3 ("Ownership and lifecycle").
+        private StaWorker _mainWorker;
+        private StaWorker _settingsWorker;
 
-        string tag;
+        // The "currently open" form pointers. These fields are written and read ONLY on the
+        // corresponding worker thread; the main STA never touches them. As a result no volatile /
+        // Interlocked is required. Cross-apartment close is achieved by posting an action onto the
+        // worker's own queue (see OnBeginShutdown).
+        private MainForm _currentMainForm;
+        private SettingsForm _currentSettingsForm;
+
+        // Filters are held by the AddIn so SignalShutdown() can be invoked from OnBeginShutdown /
+        // OnDisconnection on the main STA. The filter's _shuttingDown flag is volatile, so this
+        // cross-thread write is safe without additional synchronisation.
+        private OneNoteMessageFilter _mainFilter;
+        private OneNoteMessageFilter _settingsFilter;
 
         private bool QuickStyle { get; set; }
 
@@ -92,17 +107,21 @@ namespace NoteHighlightAddin
 		}
 
 		/// <summary>
-		/// Cleanup
+		/// Cleanup. Must return promptly - OneNote expects OnBeginShutdown to be non-blocking.
+		/// We do NOT touch _currentMainForm / _currentSettingsForm from this thread; instead the
+		/// close-action is posted onto each worker's queue and the worker closes its own form on
+		/// its own thread. The corresponding Application.Run returns, the queued action completes,
+		/// and the worker drains and exits. This avoids the BeginInvoke deadlock pattern where the
+		/// main STA waits on a worker that is mid-COM-call into OneNote (and therefore not pumping).
 		/// </summary>
 		/// <param name="custom"></param>
 		public void OnBeginShutdown(ref Array custom)
 		{
-			this.mainForm?.Invoke(new Action(() =>
-			{
-				// close the form on the forms thread
-				this.mainForm?.Close();
-				this.mainForm = null;
-			}));
+			_mainFilter?.SignalShutdown();
+			_settingsFilter?.SignalShutdown();
+			_mainWorker?.Post(() => _currentMainForm?.Close());
+			_settingsWorker?.Post(() => _currentSettingsForm?.Close());
+			// Return immediately. Do not Join here - the actual join happens in OnDisconnection.
 		}
 
 		/// <summary>
@@ -128,12 +147,55 @@ namespace NoteHighlightAddin
 		/// </summary>
 		/// <param name="RemoveMode"></param>
 		/// <param name="custom"></param>
-		[SuppressMessage("Microsoft.Reliability", "CA2001:AvoidCallingProblematicMethods", MessageId = "System.GC.Collect")]
 		public void OnDisconnection(ext_DisconnectMode RemoveMode, ref Array custom)
 		{
+			// 1. Signal both filters to stop retrying. Idempotent if OnBeginShutdown already ran.
+			_mainFilter?.SignalShutdown();
+			_settingsFilter?.SignalShutdown();
+
+			// 2. Stop each worker (CompleteAdding + Join with a 5 s timeout). The returned bool
+			//    tells us whether the worker exited cleanly; we use it to decide whether it is
+			//    safe to release the RCW it might still be holding.
+			bool mainJoined = true;
+			bool settingsJoined = true;
+
+			if (_mainWorker != null)
+			{
+				mainJoined = _mainWorker.Stop(TimeSpan.FromSeconds(5));
+			}
+			if (_settingsWorker != null)
+			{
+				settingsJoined = _settingsWorker.Stop(TimeSpan.FromSeconds(5));
+			}
+
+			// 3. Release the OneNote RCW only if the main worker joined cleanly. If it timed out,
+			//    the worker may still be inside a COM call holding that proxy; releasing here would
+			//    surface as InvalidComObjectException on the worker. The OS reclaims the RCW on
+			//    process exit; leaving it unreleased is the safer choice during a stuck shutdown.
+			//    ReleaseComObject (single decrement) not FinalReleaseComObject, per the plan.
+			if (mainJoined && OneNoteApplication != null && Marshal.IsComObject(OneNoteApplication))
+			{
+				try
+				{
+					Marshal.ReleaseComObject(OneNoteApplication);
+				}
+				catch
+				{
+					// Best-effort: never throw out of OnDisconnection.
+				}
+			}
+
+			// 4. Field-nulling MUST come after the join, not before. The worker may legitimately
+			//    touch the proxy until the moment it exits.
 			OneNoteApplication = null;
-			GC.Collect();
-			GC.WaitForPendingFinalizers();
+
+			// (Suppress unused-variable warning for settingsJoined - it is intentionally captured
+			// for future symmetry / diagnostics even though we have no settings RCW to release.)
+			GC.KeepAlive(settingsJoined);
+
+			// GC.Collect / GC.WaitForPendingFinalizers removed deliberately. They served no real
+			// purpose here and could mask leaks (the cleaner ReleaseComObject above is what
+			// actually matters).
 		}
 
 		public void OnStartupComplete(ref Array custom)
@@ -150,7 +212,7 @@ namespace NoteHighlightAddin
         {
             this.QuickStyle = isPressed;
             NoteHighlightForm.Properties.Settings.Default.QuickStyle = this.QuickStyle;
-            NoteHighlightForm.Properties.Settings.Default.Save();
+            SettingsHelper.SafeSave();
         }
 
 
@@ -164,54 +226,71 @@ namespace NoteHighlightAddin
         {
             this.DarkMode = isPressed;
             NoteHighlightForm.Properties.Settings.Default.DarkMode = this.DarkMode;
-            NoteHighlightForm.Properties.Settings.Default.Save();
+            SettingsHelper.SafeSave();
         }
 
-        //public async Task AddInButtonClicked(IRibbonControl control)
+        /// <summary>
+        /// Lazily construct the main-worker filter+thread on first use. Called only from the main
+        /// STA (ribbon callback), which Office serialises - a plain null-check is therefore enough.
+        /// </summary>
+        private StaWorker EnsureMainWorker()
+        {
+            if (_mainWorker == null)
+            {
+                _mainFilter = new OneNoteMessageFilter();
+                _mainWorker = new StaWorker("Main", _mainFilter);
+                _mainWorker.Start();
+            }
+            return _mainWorker;
+        }
+
+        /// <summary>
+        /// Lazily construct the settings-worker filter+thread on first use. See
+        /// <see cref="EnsureMainWorker"/> for the lock-free rationale.
+        /// </summary>
+        private StaWorker EnsureSettingsWorker()
+        {
+            if (_settingsWorker == null)
+            {
+                _settingsFilter = new OneNoteMessageFilter();
+                _settingsWorker = new StaWorker("Settings", _settingsFilter);
+                _settingsWorker.Start();
+            }
+            return _settingsWorker;
+        }
+
         public void AddInButtonClicked(IRibbonControl control)
         {
             try
             {
-                tag = control.Tag;
-
-                Thread t = new Thread(new ThreadStart(ShowForm));
-                t.SetApartmentState(ApartmentState.STA);
-                t.Start();
+                // Capture control.Tag (an immutable, apartment-safe managed string) on the main STA
+                // BEFORE crossing apartments. DO NOT capture `control` itself - IRibbonControl is an
+                // RCW belonging to OneNote's main STA and must not cross apartments.
+                string clickTag = control.Tag;
+                EnsureMainWorker().Post(() => ShowForm(clickTag));
             }
             catch (Exception e)
             {
-                MessageBox.Show("Exception from AddInButtonClicked: "+ e.ToString());
+                MessageBox.Show("Exception from AddInButtonClicked: " + e.ToString());
             }
-
-            //t.Join(5000);
-
-            //ShowForm();
         }
 
-        private void ShowForm()
+        private void ShowForm(string tag)
         {
+            string outFileName = Guid.NewGuid().ToString();
+            string htmlOutputPath = Path.Combine(Path.GetTempPath(), outFileName + ".html");
+
             try
             {
-                string outFileName = Guid.NewGuid().ToString();
-
-                //try
-                //{
-                //ProcessHelper processHelper = new ProcessHelper("NoteHighLightForm.exe", new string[] { control.Tag, outFileName });
-                //processHelper.IsWaitForInputIdle = true;
-                //processHelper.ProcessStart();
-
-                //CodeForm form = new CodeForm(tag, outFileName);
-                //form.ShowDialog();
-
-                //TestForm t = new TestForm();
                 var pageNode = GetPageNode();
-                string pageXml = GetPageXml(pageNode.Attribute("ID").Value);
+                string pageXml = null;
                 string selectedText = "";
                 XElement outline = null;
                 bool selectedTextFormated = false;
 
                 if (pageNode != null)
                 {
+                    pageXml = GetPageXml(pageNode.Attribute("ID").Value);
                     selectedText = GetSelectedText(pageXml, out selectedTextFormated);
 
                     if (selectedText.Trim() != "")
@@ -220,26 +299,57 @@ namespace NoteHighlightAddin
                     }
                 }
 
-                MainForm form = new MainForm(tag, outFileName, selectedText, this.QuickStyle, this.DarkMode);
-
-                System.Windows.Forms.Application.Run(form);
-                //}
-                //catch (Exception ex)
-                //{
-                //    MessageBox.Show("Error executing NoteHighLightForm.exe：" + ex.Message);
-                //    return;
-                //}
-
-                string fileName = Path.Combine(Path.GetTempPath(), outFileName + ".html");
-
-                if (File.Exists(fileName))
+                MainForm form;
+                try
                 {
-                    InsertHighLightCodeToCurrentSide(fileName, pageXml, form.Parameters, outline, selectedTextFormated);
+                    form = new MainForm(tag, outFileName, selectedText, this.QuickStyle, this.DarkMode);
+                }
+                catch (Exception ex)
+                {
+                    // Surface constructor failures to the user. The worker is pumping its own
+                    // message loop while this action runs, so MessageBox is safe here.
+                    MessageBox.Show("Could not open NoteHighlight: " + ex.Message);
+                    return;
+                }
+
+                _currentMainForm = form;
+                try
+                {
+                    // Application.Run is required, NOT form.ShowDialog(). ShowDialog needs an
+                    // owner-window context this worker STA does not have, and its modal semantics
+                    // interact poorly with the absence of a parent form on the worker. See plan
+                    // section 3 ("Click coalescing - why Application.Run(form) serialises forms").
+                    System.Windows.Forms.Application.Run(form);
+                }
+                finally
+                {
+                    _currentMainForm = null;
+                }
+
+                if (File.Exists(htmlOutputPath))
+                {
+                    InsertHighLightCodeToCurrentSide(htmlOutputPath, pageXml, form.Parameters, outline, selectedTextFormated);
                 }
             }
             catch (Exception e)
             {
                 MessageBox.Show("Exception from ShowForm: " + e.ToString());
+            }
+            finally
+            {
+                // Best-effort temp-file cleanup. Always attempt to delete the highlighter output
+                // even if InsertHighLightCodeToCurrentSide threw or the user cancelled the form.
+                try
+                {
+                    if (File.Exists(htmlOutputPath))
+                    {
+                        File.Delete(htmlOutputPath);
+                    }
+                }
+                catch
+                {
+                    // Best-effort: do not surface temp-file delete failures to the user.
+                }
             }
         }
 
@@ -247,10 +357,7 @@ namespace NoteHighlightAddin
         {
             try
             {
-               
-                Thread t = new Thread(new ThreadStart(ShowSettingsForm));
-                t.SetApartmentState(ApartmentState.STA);
-                t.Start();
+                EnsureSettingsWorker().Post(() => ShowSettingsForm());
             }
             catch (Exception e)
             {
@@ -262,15 +369,30 @@ namespace NoteHighlightAddin
         {
             try
             {
-             
-                SettingsForm form = new SettingsForm();
+                SettingsForm form;
+                try
+                {
+                    form = new SettingsForm();
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Could not open NoteHighlight settings: " + ex.Message);
+                    return;
+                }
 
-                System.Windows.Forms.Application.Run(form);
-                
+                _currentSettingsForm = form;
+                try
+                {
+                    System.Windows.Forms.Application.Run(form);
+                }
+                finally
+                {
+                    _currentSettingsForm = null;
+                }
             }
             catch (Exception e)
             {
-                MessageBox.Show("Exception from ShowForm: " + e.ToString());
+                MessageBox.Show("Exception from ShowSettingsForm: " + e.ToString());
             }
         }
 

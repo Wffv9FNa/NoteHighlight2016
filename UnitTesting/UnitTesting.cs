@@ -5,6 +5,7 @@ using GenerateHighlightContent;
 using System.Xml.Linq;
 using System.Configuration;
 using System.Linq;
+using System.Threading;
 
 namespace UnitTesting
 {
@@ -164,6 +165,147 @@ namespace UnitTesting
             XDocument output = addIn.InsertHighLightCode(htmlCode, pos, param, outline, config, selectedTextFormated, addIn.IsSelectedTextInline(Resource1.Page6));
 
             Assert.AreEqual(Resource1.Output6, output.ToString(), false);
+        }
+
+        [TestMethod]
+        public void OneNoteMessageFilter_RetryRejectedCall_BackoffSequence()
+        {
+            // SERVERCALL_RETRYLATER is 2. The filter should return the configured backoff
+            // sequence (100, 200, 400, ...) capped per-retry at 2000 ms and overall at
+            // MaxRetryMilliseconds.
+            const int SERVERCALL_RETRYLATER = 2;
+
+            var filter = new OneNoteMessageFilter
+            {
+                BackoffStepMilliseconds = 100,
+                MaxRetryMilliseconds = 30000,
+            };
+
+            int first = filter.RetryRejectedCall(IntPtr.Zero, 0, SERVERCALL_RETRYLATER);
+            int second = filter.RetryRejectedCall(IntPtr.Zero, 0, SERVERCALL_RETRYLATER);
+            int third = filter.RetryRejectedCall(IntPtr.Zero, 0, SERVERCALL_RETRYLATER);
+
+            Assert.AreEqual(100, first, "First backoff should be the initial BackoffStepMilliseconds.");
+            Assert.AreEqual(200, second, "Second backoff should be double the first.");
+            Assert.AreEqual(400, third, "Third backoff should be double the second.");
+
+            // Drive the filter until it cancels. After the budget is exhausted it must return -1.
+            int sawCancel = 0;
+            for (int i = 0; i < 200; i++)
+            {
+                int wait = filter.RetryRejectedCall(IntPtr.Zero, 0, SERVERCALL_RETRYLATER);
+                if (wait == -1)
+                {
+                    sawCancel = 1;
+                    break;
+                }
+                Assert.IsTrue(wait <= 2000, "Each individual retry must be capped at 2000 ms; got " + wait);
+            }
+            Assert.AreEqual(1, sawCancel, "Filter must eventually return -1 once MaxRetryMilliseconds is exceeded.");
+        }
+
+        [TestMethod]
+        public void OneNoteMessageFilter_RetryRejectedCall_CancelOnUnknownReject()
+        {
+            // dwRejectType values outside the documented SERVERCALL_REJECTED (0) /
+            // SERVERCALL_RETRYLATER (2) set must cause an immediate -1 (cancel).
+            var filter = new OneNoteMessageFilter();
+
+            Assert.AreEqual(-1, filter.RetryRejectedCall(IntPtr.Zero, 0, 1));
+            Assert.AreEqual(-1, filter.RetryRejectedCall(IntPtr.Zero, 0, 7));
+            Assert.AreEqual(-1, filter.RetryRejectedCall(IntPtr.Zero, 0, 99));
+        }
+
+        [TestMethod]
+        public void OneNoteMessageFilter_RetryRejectedCall_ShutdownShortCircuits()
+        {
+            const int SERVERCALL_RETRYLATER = 2;
+            var filter = new OneNoteMessageFilter();
+
+            // Sanity: before shutdown, a retryable reject yields a positive backoff.
+            int beforeShutdown = filter.RetryRejectedCall(IntPtr.Zero, 0, SERVERCALL_RETRYLATER);
+            Assert.IsTrue(beforeShutdown > 0, "Pre-shutdown should yield a positive backoff, got " + beforeShutdown);
+
+            filter.SignalShutdown();
+
+            // After shutdown the filter must return -1 regardless of dwRejectType.
+            Assert.AreEqual(-1, filter.RetryRejectedCall(IntPtr.Zero, 0, SERVERCALL_RETRYLATER));
+            Assert.AreEqual(-1, filter.RetryRejectedCall(IntPtr.Zero, 0, 0));
+            Assert.AreEqual(-1, filter.RetryRejectedCall(IntPtr.Zero, 0, 42));
+        }
+
+        [TestMethod]
+        public void StaWorker_PostedActionRunsOnStaThread()
+        {
+            // Verifies the worker actually pumps queued actions on an STA thread. Completion is
+            // signalled via ManualResetEventSlim - never Thread.Sleep - so the test is deterministic.
+            // The exception sink is a no-op so a failure inside the action does not pop a MessageBox
+            // from the default sink.
+            var filter = new OneNoteMessageFilter();
+            var worker = new StaWorker("UnitTest-Apartment", filter, _ => { });
+            try
+            {
+                worker.Start();
+
+                ApartmentState observed = ApartmentState.Unknown;
+                using (var done = new ManualResetEventSlim(false))
+                {
+                    worker.Post(() =>
+                    {
+                        observed = Thread.CurrentThread.GetApartmentState();
+                        done.Set();
+                    });
+
+                    Assert.IsTrue(done.Wait(2000), "Posted action did not run within 2 s.");
+                }
+
+                Assert.AreEqual(ApartmentState.STA, observed, "Worker thread must run posted actions on an STA apartment.");
+            }
+            finally
+            {
+                worker.Stop(TimeSpan.FromSeconds(2));
+            }
+        }
+
+        [TestMethod]
+        public void StaWorker_StopJoinsCleanly()
+        {
+            // Constructing a worker, starting it, and immediately stopping it must drain and join
+            // within the timeout (no actions posted, so the consuming loop exits as soon as
+            // CompleteAdding flips the queue).
+            var filter = new OneNoteMessageFilter();
+            var worker = new StaWorker("UnitTest-StopClean", filter, _ => { });
+            worker.Start();
+
+            bool joined = worker.Stop(TimeSpan.FromSeconds(2));
+
+            Assert.IsTrue(joined, "Worker must join cleanly within the 2 s timeout when no work is queued.");
+        }
+
+        [TestMethod]
+        public void StaWorker_ExceptionInActionDoesNotKillThread()
+        {
+            // Per Step 2 spec: a per-action try/catch keeps the worker alive across non-fatal
+            // exceptions. Post a throwing action then a signalling action and assert the second
+            // one still runs. The exception sink swallows so the test output stays clean.
+            var filter = new OneNoteMessageFilter();
+            var worker = new StaWorker("UnitTest-SurviveThrow", filter, _ => { });
+            try
+            {
+                worker.Start();
+
+                using (var done = new ManualResetEventSlim(false))
+                {
+                    worker.Post(() => { throw new InvalidOperationException("boom"); });
+                    worker.Post(() => done.Set());
+
+                    Assert.IsTrue(done.Wait(2000), "Worker must continue processing after a non-fatal exception in a previous action.");
+                }
+            }
+            finally
+            {
+                worker.Stop(TimeSpan.FromSeconds(2));
+            }
         }
 
         [TestMethod]

@@ -37,7 +37,7 @@ namespace NoteHighlightAddin
                 NoteHighlightForm.Properties.Settings.Default.Font = fontDialog1.Font.Name;
                 NoteHighlightForm.Properties.Settings.Default.FontSize = (int)Math.Round(fontDialog1.Font.Size);
 
-                NoteHighlightForm.Properties.Settings.Default.Save();
+                SettingsHelper.SafeSave();
             }
 
             
@@ -47,7 +47,7 @@ namespace NoteHighlightAddin
         {
             NoteHighlightForm.Properties.Settings.Default.ShowTableBorder = cbShowTableBorder.Checked;
 
-            NoteHighlightForm.Properties.Settings.Default.Save();
+            SettingsHelper.SafeSave();
         }
 
         private void SettingsForm_Shown(object sender, EventArgs e)

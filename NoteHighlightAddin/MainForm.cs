@@ -299,7 +299,7 @@ namespace NoteHighlightAddin
             defaultSettings.SaveOnClipboard = this.cbx_Clipboard.Checked;
             defaultSettings.HighLightStyle = this.cbx_style.SelectedIndex;
             defaultSettings.BackgroundColor = this.btnBackground.BackColor;
-            defaultSettings.Save();
+            SettingsHelper.SafeSave();
         }
 
         private void btnBackground_Click(object sender, EventArgs e)
