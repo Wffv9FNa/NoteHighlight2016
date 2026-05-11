@@ -108,20 +108,33 @@ namespace NoteHighlightAddin
 
 		/// <summary>
 		/// Cleanup. Must return promptly - OneNote expects OnBeginShutdown to be non-blocking.
-		/// We do NOT touch _currentMainForm / _currentSettingsForm from this thread; instead the
-		/// close-action is posted onto each worker's queue and the worker closes its own form on
-		/// its own thread. The corresponding Application.Run returns, the queued action completes,
-		/// and the worker drains and exits. This avoids the BeginInvoke deadlock pattern where the
-		/// main STA waits on a worker that is mid-COM-call into OneNote (and therefore not pumping).
+		/// Close is delivered via the form's own BeginInvoke (asynchronous, fire-and-forget) so it
+		/// lands on the WinForms message pump that Application.Run is actively pumping. Posting to
+		/// the worker's BlockingCollection here would never fire while the worker is parked inside
+		/// Application.Run, since the queue is only drained by the outer foreach in StaWorker.Run.
+		/// BeginInvoke (unlike synchronous Invoke) does not block the main STA, so the
+		/// "main-STA-waits-on-worker-mid-COM-call" deadlock does not apply.
 		/// </summary>
 		/// <param name="custom"></param>
 		public void OnBeginShutdown(ref Array custom)
 		{
 			_mainFilter?.SignalShutdown();
 			_settingsFilter?.SignalShutdown();
-			_mainWorker?.Post(() => _currentMainForm?.Close());
-			_settingsWorker?.Post(() => _currentSettingsForm?.Close());
-			// Return immediately. Do not Join here - the actual join happens in OnDisconnection.
+
+			var mf = _currentMainForm;
+			if (mf != null)
+			{
+				try { mf.BeginInvoke(new Action(() => { try { mf.Close(); } catch { } })); }
+				catch { /* form may already be disposed or its handle not yet created */ }
+			}
+
+			var sf = _currentSettingsForm;
+			if (sf != null)
+			{
+				try { sf.BeginInvoke(new Action(() => { try { sf.Close(); } catch { } })); }
+				catch { /* form may already be disposed or its handle not yet created */ }
+			}
+			// Return immediately. The actual worker join happens in OnDisconnection.
 		}
 
 		/// <summary>
