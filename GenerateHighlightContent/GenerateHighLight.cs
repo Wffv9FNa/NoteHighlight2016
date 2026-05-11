@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.IO;
 using System.Diagnostics;
 using System.Reflection;
@@ -55,11 +56,16 @@ namespace GenerateHighlightContent
             if (_section == null)
                 throw new FileNotFoundException("ConfigurationManager.GetSection(\"HighLightSection\") failed!");
 
+            var workingDirectory = Path.Combine(ProcessHelper.GetDirectoryFromPath(Assembly.GetCallingAssembly().Location), _section.FolderName);
+
+            // Reject any value that could break out of the quoted argument or inject a new
+            // highlight.exe switch (e.g. --plug-in=evil.lua). highlight.exe supports Lua
+            // plug-ins which can run arbitrary host commands, so unchecked args = user-level RCE.
+            ValidateArguments(workingDirectory);
+
             File.WriteAllText(inputFileName, Content, Encoding.UTF8);
             try
             {
-                var workingDirectory = Path.Combine(ProcessHelper.GetDirectoryFromPath(Assembly.GetCallingAssembly().Location), _section.FolderName);
-
                 ProcessHelper helper = new ProcessHelper(workingDirectory, _section.ProcessName);
                 helper.Arguments = GenerateArguments(inputFileName, outputFileName);
                 helper.IsWaitForInputIdle = false;
@@ -78,6 +84,61 @@ namespace GenerateHighlightContent
                 // produce output. Otherwise the user's raw source code is left in %TEMP%
                 // indefinitely on every error path.
                 try { if (File.Exists(inputFileName)) File.Delete(inputFileName); } catch { }
+            }
+        }
+
+        /// <summary>
+        /// Identifier-shaped values (codeType, theme name): letters, digits, '_', '+', '-', '.'.
+        /// Length capped to keep error messages bounded.
+        /// </summary>
+        private static readonly Regex IdentifierRegex =
+            new Regex(@"^[A-Za-z0-9_+.\-]{1,64}$", RegexOptions.Compiled);
+
+        /// <summary>
+        /// Reject font/codeType/theme values that could close the quoted token in
+        /// GenerateArguments and append attacker-controlled highlight.exe switches.
+        /// Allow-list HighLightStyle against the bundled themes folder.
+        /// </summary>
+        private void ValidateArguments(string workingDirectory)
+        {
+            ValidateFontName(Font);
+            ValidateIdentifier("CodeType", CodeType);
+            ValidateIdentifier("HighLightStyle", HighLightStyle);
+
+            // FontSize is an int; nothing to do.
+
+            string themesDir = Path.Combine(workingDirectory, _section.ThemeFolder);
+            string themePath = Path.Combine(themesDir, HighLightStyle + ".theme");
+            if (!File.Exists(themePath))
+                throw new ArgumentException(
+                    String.Format("Unknown highlight theme '{0}'.", HighLightStyle));
+        }
+
+        private static void ValidateIdentifier(string name, string value)
+        {
+            if (String.IsNullOrEmpty(value))
+                throw new ArgumentException(name + " must not be empty.");
+            if (value.StartsWith("-"))
+                throw new ArgumentException(name + " must not start with '-'.");
+            if (!IdentifierRegex.IsMatch(value))
+                throw new ArgumentException(
+                    name + " contains invalid characters (allowed: letters, digits, '_', '+', '-', '.').");
+        }
+
+        private static void ValidateFontName(string value)
+        {
+            if (String.IsNullOrEmpty(value))
+                throw new ArgumentException("Font must not be empty.");
+            if (value.Length > 128)
+                throw new ArgumentException("Font name is too long.");
+            if (value.IndexOf('"') >= 0)
+                throw new ArgumentException("Font must not contain '\"'.");
+            if (value.StartsWith("-"))
+                throw new ArgumentException("Font must not start with '-'.");
+            foreach (char c in value)
+            {
+                if (Char.IsControl(c))
+                    throw new ArgumentException("Font must not contain control characters.");
             }
         }
 
