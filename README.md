@@ -8,12 +8,12 @@
 [![Follow @NoteHighlight](https://img.shields.io/twitter/follow/NoteHighlight.svg?style=social&label=Follow%20@NoteHighlight)](https://twitter.com/NoteHighlight?ref_src=twsrc%5Etfw)<br >
 Follow on Twitter for updates and general questions. For bug reports and feature requests please use [Issues](https://github.com/elvirbrk/NoteHighlight2016/issues) page.
 
-Based on NoteHighlight 2013 (https://notehighlight2013.codeplex.com) and VanillaAddin (https://github.com/OneNoteDev/VanillaAddIn) to create working addin for OneNote 2016 and OneNote for O365 (32-bit and 64-bit) 
+Based on NoteHighlight 2013 (https://notehighlight2013.codeplex.com) and VanillaAddin (https://github.com/OneNoteDev/VanillaAddIn) to create working addin for 64-bit OneNote 2016 and OneNote for O365
 
-Syntax highlighting performed using https://gitlab.com/saalen/highlight
+Syntax highlighting performed using https://gitlab.com/saalen/highlight (currently v4.19)
 
 # Install
-To install just run MSI file from [releases](https://github.com/elvirbrk/NoteHighlight2016/releases). For Office 64-bit use NoteHighlight2016.msi, and for Office 32-bit use NoteHighlight2016x86.msi.
+To install just run NoteHighlight2016.msi from [releases](https://github.com/elvirbrk/NoteHighlight2016/releases). Only 64-bit Office is supported.
 See [here](https://support.office.com/en-us/article/About-Office-What-version-of-Office-am-I-using-932788B8-A3CE-44BF-BB09-E334518B8B19?ui=en-US&rs=en-US&ad=US) how to check which Office version you have.
 
 In case AddIn doesn't show after install, check if this helps [Not showing after install](https://github.com/elvirbrk/NoteHighlight2016/issues/7)
@@ -34,7 +34,7 @@ In case AddIn doesn't show after install, check if this helps [Not showing after
 
 # Additional languages
 1. Go to installation folder and find file ribbon.xml and open it with text editor <br />
-Default installation folder: C:\Program Files (x86)\CodingRoad\NoteHighlight2016\ or C:\Program Files\CodingRoad\NoteHighlight2016\
+Default installation folder: C:\Program Files\CodingRoad\NoteHighlight2016\
 2. Edit property "visible" from "false" to "true" for languages that you want to use. It is necessary to restart OneNote for changes to take effect
 
 It is also possible to add new languages (supported by highlight tool) by adding new rows to ribbon.xml but if you need new language then you are smart enough to figure it out :)
