@@ -314,8 +314,8 @@ namespace NoteHighlightAddin
 
             if (_quickStyle)
             {
-                btnCodeHighLight.PerformClick()
-;            }
+                btnCodeHighLight.PerformClick();
+            }
             else
             {
                 // This is necessary in order for SetForegroundWindow to work consistently

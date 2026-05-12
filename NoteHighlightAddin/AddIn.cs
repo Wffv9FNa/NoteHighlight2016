@@ -566,7 +566,7 @@ namespace NoteHighlightAddin
             catch (Exception ex)
             {
                 MessageBox.Show("Exception from onApp.GetHierarchy:" + ex.Message);
-                return null; ;
+                return null;
             }
 
             var doc = XDocument.Parse(notebookXml);
