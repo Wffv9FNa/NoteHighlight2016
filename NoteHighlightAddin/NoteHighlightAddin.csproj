@@ -132,6 +132,13 @@
     <Compile Include="SettingsForm.Designer.cs">
       <DependentUpon>SettingsForm.cs</DependentUpon>
     </Compile>
+    <Compile Include="Preview\PreviewPane.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Preview\PreviewPane.Designer.cs">
+      <DependentUpon>PreviewPane.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Preview\PreviewHtmlWrapper.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="highlight\highlight.exe">
@@ -1148,6 +1155,10 @@
     </EmbeddedResource>
     <EmbeddedResource Include="SettingsForm.resx">
       <DependentUpon>SettingsForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Preview\PreviewPane.resx">
+      <DependentUpon>PreviewPane.cs</DependentUpon>
+      <SubType>Designer</SubType>
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
