@@ -59,6 +59,8 @@ namespace NoteHighlightAddin.Preview
             this.Controls.Add(this.lblRendering);
             this.Controls.Add(this.browser);
             this.Name = "PreviewPane";
+            this.AccessibleName = "Highlight preview";
+            this.AccessibleRole = System.Windows.Forms.AccessibleRole.Pane;
             this.Size = new System.Drawing.Size(400, 300);
             this.ResumeLayout(false);
             this.PerformLayout();

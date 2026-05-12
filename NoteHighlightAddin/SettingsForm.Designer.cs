@@ -80,11 +80,13 @@ namespace NoteHighlightAddin
             this.splitContainer.Panel1.Controls.Add(this.cbShowTableBorder);
             this.splitContainer.Panel1.Controls.Add(this.btnFont);
             this.splitContainer.Panel1MinSize = 200;
+            this.splitContainer.Panel1.TabIndex = 0;
             //
             // splitContainer.Panel2
             //
             this.splitContainer.Panel2.Controls.Add(this._previewPane);
             this.splitContainer.Panel2MinSize = 200;
+            this.splitContainer.Panel2.TabIndex = 1;
             this.splitContainer.Size = new System.Drawing.Size(408, 355);
             this.splitContainer.SplitterDistance = 204;
             this.splitContainer.TabIndex = 0;

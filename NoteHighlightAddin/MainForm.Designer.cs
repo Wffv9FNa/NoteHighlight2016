@@ -179,11 +179,13 @@
             //
             this.splitContainer.Panel1.Controls.Add(this.txtCode);
             this.splitContainer.Panel1MinSize = 200;
+            this.splitContainer.Panel1.TabIndex = 0;
             //
             // splitContainer.Panel2
             //
             this.splitContainer.Panel2.Controls.Add(this._previewPane);
             this.splitContainer.Panel2MinSize = 200;
+            this.splitContainer.Panel2.TabIndex = 1;
             this.splitContainer.Size = new System.Drawing.Size(517, 380);
             this.splitContainer.SplitterDistance = 310;
             this.splitContainer.TabIndex = 0;
