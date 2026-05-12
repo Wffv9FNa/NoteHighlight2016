@@ -156,7 +156,6 @@
     <Content Include="icon.ico">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
-    <Content Include="Lib\ICSharpCode.TextEditor.dll" />
     <Content Include="Resources\CPP.png" />
     <Content Include="Resources\CSharp.png" />
     <Content Include="Resources\CSS.png" />

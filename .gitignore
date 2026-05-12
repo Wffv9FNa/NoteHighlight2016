@@ -187,13 +187,26 @@ FakesAssemblies/
 GeneratedArtifacts/
 _Pvt_Extensions/
 ModelManifest.xml
-INSTALLER/*
-.vs/config/applicationhost.config
+INSTALLER/
 /GenerateHighlightContent/HighlightContent2.snk
 /Helper/Helper2.snk
 /img/ONOMSPY.zip
 /img/onomspy.exe
-/.vs/
+
+# Visual Studio per-solution cache (any depth)
+**/.vs/
+
+# NuGet / restore artefacts
+*.lock.json
+project.lock.json
+*.nuget.props
+*.nuget.targets
+
+# MSBuild binary log
+*.binlog
+
+# ReSharper / Rider per-user overrides
+*.dotsettings.user
 
 # Stray test-build artefacts at repo root
 /Microsoft.VisualStudio.QualityTools.UnitTestFramework.dll
