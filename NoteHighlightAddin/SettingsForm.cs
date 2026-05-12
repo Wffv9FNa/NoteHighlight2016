@@ -33,6 +33,13 @@ public static class FibDemo
     public static void Main() { Console.WriteLine(""Fib(40) = "" + Fib(40)); }
 }";
 
+        /// <summary>
+        /// Set while the splitter is being positioned programmatically (initial load,
+        /// resize-driven re-apply) so the SplitterMoved handler does not write the
+        /// transient value back to user.config.
+        /// </summary>
+        private bool _suppressSplitterPersist;
+
         public SettingsForm()
         {
             InitializeComponent();
@@ -41,6 +48,58 @@ public static class FibDemo
             btnFont.Text = "Font:" + fontDialog1.Font.Name + ", Size:" + fontDialog1.Font.Size;
             btnFont.Font = fontDialog1.Font;
             cbShowTableBorder.Checked = NoteHighlightForm.Properties.Settings.Default.ShowTableBorder;
+
+            this.splitContainer.SplitterMoved += SplitContainer_SplitterMoved;
+        }
+
+        /// <summary>
+        /// Applies the persisted splitter percentage to the SplitContainer. Honours
+        /// Panel1MinSize and Panel2MinSize so the SplitContainer does not throw.
+        /// </summary>
+        private void ApplySavedSplitterDistance()
+        {
+            if (this.splitContainer == null) return;
+            int width = this.splitContainer.Width;
+            if (width <= 0) return;
+
+            int percent = NoteHighlightForm.Properties.Settings.Default.SettingsFormPreviewSplitter;
+            if (percent <= 0 || percent >= 100) percent = 60;
+
+            int desired = (int)Math.Round(width * (percent / 100.0));
+
+            int min = this.splitContainer.Panel1MinSize;
+            int max = width - this.splitContainer.Panel2MinSize - this.splitContainer.SplitterWidth;
+            if (max < min) return;
+
+            int clamped = Math.Max(min, Math.Min(max, desired));
+
+            _suppressSplitterPersist = true;
+            try
+            {
+                this.splitContainer.SplitterDistance = clamped;
+            }
+            finally
+            {
+                _suppressSplitterPersist = false;
+            }
+        }
+
+        private void SplitContainer_SplitterMoved(object sender, SplitterEventArgs e)
+        {
+            if (_suppressSplitterPersist) return;
+            if (!this.IsHandleCreated) return;
+
+            int width = this.splitContainer.Width;
+            if (width <= 0) return;
+
+            int percent = (int)Math.Round(this.splitContainer.SplitterDistance * 100.0 / width);
+            if (percent < 1) percent = 1;
+            if (percent > 99) percent = 99;
+
+            if (NoteHighlightForm.Properties.Settings.Default.SettingsFormPreviewSplitter == percent) return;
+
+            NoteHighlightForm.Properties.Settings.Default.SettingsFormPreviewSplitter = percent;
+            SettingsHelper.SafeSave();
         }
 
         private void BtnFont_Click(object sender, EventArgs e)
@@ -116,6 +175,8 @@ public static class FibDemo
             this.WindowState = FormWindowState.Normal;
 
             NativeMethods.SetForegroundWindow(this.Handle);
+
+            ApplySavedSplitterDistance();
 
             this.BeginInvoke(new Action(SchedulePreview));
         }

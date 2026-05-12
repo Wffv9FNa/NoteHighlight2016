@@ -148,5 +148,35 @@ namespace NoteHighlightForm.Properties {
                 this["ShowTableBorder"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("60")]
+        public int MainFormPreviewSplitter
+        {
+            get
+            {
+                return (int)(this["MainFormPreviewSplitter"]);
+            }
+            set
+            {
+                this["MainFormPreviewSplitter"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("60")]
+        public int SettingsFormPreviewSplitter
+        {
+            get
+            {
+                return (int)(this["SettingsFormPreviewSplitter"]);
+            }
+            set
+            {
+                this["SettingsFormPreviewSplitter"] = value;
+            }
+        }
     }
 }

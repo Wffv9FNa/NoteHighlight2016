@@ -42,6 +42,13 @@ namespace NoteHighlightAddin
 
         public bool DarkMode => _darkMode;
 
+        /// <summary>
+        /// Set while the splitter is being positioned programmatically (initial load,
+        /// resize-driven re-apply) so the SplitterMoved handler does not write the
+        /// transient value back to user.config. Cleared once the user takes control.
+        /// </summary>
+        private bool _suppressSplitterPersist;
+
         #endregion
 
         #region -- Constructor --
@@ -68,6 +75,61 @@ namespace NoteHighlightAddin
             this.cbx_style.SelectedIndexChanged += (s, e) => SchedulePreview();
             this.cbx_lineNumber.CheckedChanged += (s, e) => SchedulePreview();
             this.btnBackground.BackColorChanged += (s, e) => SchedulePreview();
+
+            this.splitContainer.SplitterMoved += SplitContainer_SplitterMoved;
+        }
+
+        /// <summary>
+        /// Applies the persisted splitter percentage to the SplitContainer.
+        /// Called after Shown so the SplitContainer has its final width and the
+        /// Panel1/Panel2 MinSize clamps are honoured by the framework.
+        /// </summary>
+        private void ApplySavedSplitterDistance()
+        {
+            if (this.splitContainer == null) return;
+            int width = this.splitContainer.Width;
+            if (width <= 0) return;
+
+            int percent = NoteHighlightForm.Properties.Settings.Default.MainFormPreviewSplitter;
+            if (percent <= 0 || percent >= 100) percent = 60;
+
+            int desired = (int)Math.Round(width * (percent / 100.0));
+
+            // Honour Panel1MinSize and Panel2MinSize. The SplitContainer would throw
+            // an InvalidOperationException if we set a value that violates either.
+            int min = this.splitContainer.Panel1MinSize;
+            int max = width - this.splitContainer.Panel2MinSize - this.splitContainer.SplitterWidth;
+            if (max < min) return; // not enough room yet; leave designer default
+
+            int clamped = Math.Max(min, Math.Min(max, desired));
+
+            _suppressSplitterPersist = true;
+            try
+            {
+                this.splitContainer.SplitterDistance = clamped;
+            }
+            finally
+            {
+                _suppressSplitterPersist = false;
+            }
+        }
+
+        private void SplitContainer_SplitterMoved(object sender, SplitterEventArgs e)
+        {
+            if (_suppressSplitterPersist) return;
+            if (!this.IsHandleCreated) return;
+
+            int width = this.splitContainer.Width;
+            if (width <= 0) return;
+
+            int percent = (int)Math.Round(this.splitContainer.SplitterDistance * 100.0 / width);
+            if (percent < 1) percent = 1;
+            if (percent > 99) percent = 99;
+
+            if (NoteHighlightForm.Properties.Settings.Default.MainFormPreviewSplitter == percent) return;
+
+            NoteHighlightForm.Properties.Settings.Default.MainFormPreviewSplitter = percent;
+            SettingsHelper.SafeSave();
         }
 
         private void SchedulePreview()
@@ -340,6 +402,8 @@ namespace NoteHighlightAddin
                 this.WindowState = FormWindowState.Normal;
 
                 NativeMethods.SetForegroundWindow(this.Handle);
+
+                ApplySavedSplitterDistance();
 
                 this.BeginInvoke(new Action(SchedulePreview));
             }
