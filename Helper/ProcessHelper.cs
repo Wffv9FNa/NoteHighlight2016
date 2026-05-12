@@ -95,11 +95,34 @@ namespace Helper
         /// </summary>
         public void ProcessStart()
         {
+            // Resolve FileName against WorkingDirectory when it is not already
+            // an absolute path. With UseShellExecute = false (required for stderr
+            // capture and CreateNoWindow), CreateProcess searches PATH only - it
+            // does NOT consult ProcessStartInfo.WorkingDirectory when locating the
+            // executable. A bare "highlight.exe" would therefore raise
+            // Win32Exception 0x2 (ERROR_FILE_NOT_FOUND) even though the binary
+            // sits beside the add-in in <addinDir>\highlight\.
+            string resolvedFileName = FileName;
+            if (!String.IsNullOrEmpty(resolvedFileName)
+                && !Path.IsPathRooted(resolvedFileName)
+                && !String.IsNullOrEmpty(WorkingDirectory))
+            {
+                resolvedFileName = Path.Combine(WorkingDirectory, resolvedFileName);
+            }
+
+            if (!String.IsNullOrEmpty(resolvedFileName) && !File.Exists(resolvedFileName))
+            {
+                throw new FileNotFoundException(
+                    "Executable not found at resolved path '" + resolvedFileName +
+                    "' (WorkingDirectory='" + WorkingDirectory + "', FileName='" +
+                    FileName + "').", resolvedFileName);
+            }
+
             using (Process p = new Process())
             {
                 ProcessStartInfo info = new ProcessStartInfo();
                 info.WorkingDirectory = WorkingDirectory;
-                info.FileName = FileName;
+                info.FileName = resolvedFileName;
                 info.Arguments = Arguments;
                 info.WindowStyle = WindowStyle;
                 info.UseShellExecute = false;

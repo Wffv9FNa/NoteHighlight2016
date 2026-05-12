@@ -69,6 +69,42 @@ namespace NoteHighlightAddin
 		{
 		}
 
+        /// <summary>
+        /// Returns the directory containing NoteHighlightAddin.dll. Prefer
+        /// Assembly.Location, but fall back to CodeBase for hosts that load the
+        /// assembly from a byte array (Location returns string.Empty in that
+        /// case). This is the authoritative install path used by callers that
+        /// need to locate sibling files (highlight.exe, themes, dll.config).
+        /// </summary>
+        internal static string GetAddinDirectory()
+        {
+            var asm = typeof(AddIn).Assembly;
+            string loc = null;
+            try
+            {
+                loc = asm.Location;
+            }
+            catch (NotSupportedException) { /* dynamic assembly */ }
+
+            if (string.IsNullOrEmpty(loc))
+            {
+                try
+                {
+                    var cb = asm.CodeBase;
+                    if (!string.IsNullOrEmpty(cb))
+                        loc = new Uri(cb).LocalPath;
+                }
+                catch (NotSupportedException) { /* dynamic assembly */ }
+                catch (UriFormatException) { /* malformed CodeBase URI */ }
+                catch (Exception)
+                {
+                    // Defensive: never let path-discovery throw out of a ribbon callback.
+                }
+            }
+
+            return string.IsNullOrEmpty(loc) ? null : Path.GetDirectoryName(loc);
+        }
+
 		/// <summary>
 		/// Returns the XML in Ribbon.xml so OneNote knows how to render our ribbon
 		/// </summary>
@@ -513,7 +549,7 @@ namespace NoteHighlightAddin
                         position = GetMousePointPosition(pageRoot);
                     }
 
-                    var page = InsertHighLightCode(htmlContent, position, parameters, outline, (new GenerateHighLight()).Config, selectedTextFormated, IsSelectedTextInline(pageRoot));
+                    var page = InsertHighLightCode(htmlContent, position, parameters, outline, (new GenerateHighLight(GetAddinDirectory())).Config, selectedTextFormated, IsSelectedTextInline(pageRoot));
                     page.Root.SetAttributeValue("ID", existingPageId);
 
                     //Bug fix - remove overflow value for Indents

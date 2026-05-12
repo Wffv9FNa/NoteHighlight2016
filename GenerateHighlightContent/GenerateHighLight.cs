@@ -32,25 +32,99 @@ namespace GenerateHighlightContent
         /// <summary> highlight.exe 參數 設定於 App.config 的 HighLightSection 區塊 </summary>
         private HighLightSection _section;
 
+        /// <summary>
+        /// The add-in install directory. Captured at construction time so the
+        /// highlight.exe working directory is derived from the same authoritative
+        /// path the caller used to resolve the config file - not re-probed via
+        /// Assembly.Location, which is unreliable under COM activation.
+        /// </summary>
+        private readonly string _addinDirectory;
+
         public HighLightSection Config { get { return _section; } }
         #endregion
 
         #region -- IGenerageHighLight Member --
 
-        public GenerateHighLight()
+        /// <summary>
+        /// Production constructor. The caller (the NoteHighlightAddin DLL) knows
+        /// its own install location authoritatively and passes it in. The
+        /// HighLightSection lives in NoteHighlightAddin.dll.config alongside
+        /// NoteHighlightAddin.dll; the GenerateHighlightContent App.config is
+        /// not copied to output and must not be relied on.
+        /// </summary>
+        /// <param name="addinDirectory">Directory containing NoteHighlightAddin.dll
+        /// and its .config file. Must not be null or empty.</param>
+        public GenerateHighLight(string addinDirectory)
         {
-            // Use the defining assembly rather than GetCallingAssembly(): the latter
-            // can resolve to mscorlib (shadow-copied) or the host process under
-            // cross-AppDomain COM activation, in which case OpenExeConfiguration would
-            // look for the wrong .config file. The current call only worked because
-            // the JIT happened to inline this constructor into its caller.
-            // Note: a richer FileNotFoundException with the resolved path is tracked
-            // separately under M3; H6 deliberately keeps the minimum churn here.
-            var assemblyLocation = typeof(GenerateHighLight).Assembly.Location;
-            if (string.IsNullOrEmpty(assemblyLocation))
-                assemblyLocation = new Uri(typeof(GenerateHighLight).Assembly.CodeBase).LocalPath;
-            Configuration c = ConfigurationManager.OpenExeConfiguration(assemblyLocation);
+            if (string.IsNullOrEmpty(addinDirectory))
+                throw new ArgumentException(
+                    "addinDirectory must not be null or empty.", "addinDirectory");
+
+            _addinDirectory = addinDirectory;
+
+            var configPath = Path.Combine(addinDirectory, "NoteHighlightAddin.dll.config");
+            if (!File.Exists(configPath))
+            {
+                throw new FileNotFoundException(
+                    "NoteHighlightAddin.dll.config not found at expected install path '" +
+                    configPath + "'.", configPath);
+            }
+
+            var map = new ExeConfigurationFileMap { ExeConfigFilename = configPath };
+            Configuration c = ConfigurationManager.OpenMappedExeConfiguration(
+                map, ConfigurationUserLevel.None);
             _section = c.GetSection("HighLightSection") as HighLightSection;
+            if (_section == null)
+            {
+                throw new ConfigurationErrorsException(
+                    "HighLightSection not found. Tried config path: '" + configPath +
+                    "' (File.Exists=" + File.Exists(configPath) + ").");
+            }
+
+            Trace.TraceInformation(
+                "NoteHighlight2016: loaded HighLightSection from '" + configPath + "'.");
+        }
+
+        /// <summary>
+        /// Compatibility constructor for COM activation and MSTest. Production
+        /// callers MUST use the constructor that takes an explicit add-in
+        /// directory - this overload depends on Assembly.Location, which is
+        /// unreliable under cross-AppDomain COM activation (it can return the
+        /// empty string for assemblies loaded from byte arrays or shadow copies).
+        /// </summary>
+        public GenerateHighLight() : this(BestEffortAddinDirectory())
+        {
+        }
+
+        private static string BestEffortAddinDirectory()
+        {
+            var asm = typeof(GenerateHighLight).Assembly;
+            string path = null;
+            try
+            {
+                path = asm.Location;
+            }
+            catch (NotSupportedException) { /* dynamic assembly */ }
+
+            if (string.IsNullOrEmpty(path))
+            {
+                try
+                {
+                    var cb = asm.CodeBase;
+                    if (!string.IsNullOrEmpty(cb))
+                        path = new Uri(cb).LocalPath;
+                }
+                catch (NotSupportedException) { /* dynamic assembly */ }
+                catch (UriFormatException) { /* malformed CodeBase URI */ }
+            }
+
+            if (string.IsNullOrEmpty(path))
+                throw new InvalidOperationException(
+                    "Could not determine the add-in install directory. Use the " +
+                    "GenerateHighLight(string addinDirectory) constructor and pass " +
+                    "the path explicitly.");
+
+            return Path.GetDirectoryName(path);
         }
 
         /// <summary> 呼叫highlight.exe 產生高亮後的html </summary>
@@ -66,13 +140,11 @@ namespace GenerateHighlightContent
             if (_section == null)
                 throw new FileNotFoundException("ConfigurationManager.GetSection(\"HighLightSection\") failed!");
 
-            // typeof(GenerateHighLight).Assembly avoids the JIT-inlining sensitivity
-            // of GetCallingAssembly() (see H6); fall back to CodeBase for the
-            // load-from-byte-array case where Location returns string.Empty.
-            var assemblyLocation = typeof(GenerateHighLight).Assembly.Location;
-            if (string.IsNullOrEmpty(assemblyLocation))
-                assemblyLocation = new Uri(typeof(GenerateHighLight).Assembly.CodeBase).LocalPath;
-            var workingDirectory = Path.Combine(ProcessHelper.GetDirectoryFromPath(assemblyLocation), _section.FolderName);
+            // Use the add-in directory the caller supplied at construction time.
+            // Do NOT re-derive this from Assembly.Location: that path can return
+            // string.Empty under cross-AppDomain COM activation, and we would
+            // then resolve highlight.exe against OneNote's CWD (Office16).
+            var workingDirectory = Path.Combine(_addinDirectory, _section.FolderName);
 
             // Reject any value that could break out of the quoted argument or inject a new
             // highlight.exe switch (e.g. --plug-in=evil.lua). highlight.exe supports Lua

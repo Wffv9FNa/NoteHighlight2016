@@ -80,7 +80,7 @@ namespace NoteHighlightAddin
         {
             try
             {
-                HighLightSection section = (new GenerateHighLight()).Config;
+                HighLightSection section = (new GenerateHighLight(AddIn.GetAddinDirectory())).Config;
                 // Use typeof(MainForm).Assembly rather than GetCallingAssembly():
                 // GetCallingAssembly is sensitive to JIT inlining and cross-AppDomain
                 // COM callers, so it may resolve to mscorlib or ONENOTE.EXE instead of
@@ -144,7 +144,7 @@ namespace NoteHighlightAddin
                 MessageBox.Show("Please select code Style!");
                 return;
             }
-            IGenerateHighLight generate = new GenerateHighLight();
+            IGenerateHighLight generate = new GenerateHighLight(AddIn.GetAddinDirectory());
 
             string outputFileName = String.Empty;
 
