@@ -144,18 +144,6 @@
     <Content Include="highlight\highlight.exe">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
-    <Content Include="highlight\libgcc_s_dw2-1.dll">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-    <Content Include="highlight\libstdc++-6.dll">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-    <Content Include="highlight\libwinpthread-1.dll">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-    <Content Include="highlight\mingwm10.dll">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
     <None Include="App.config">
       <SubType>Designer</SubType>
     </None>
@@ -178,9 +166,6 @@
     <Content Include="Resources\SQL.png" />
     <Content Include="Resources\XHTML.png" />
     <Content Include="Resources\XML.png" />
-    <Content Include="highlight\langDefs\abap4.lang">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
     <Content Include="highlight\langDefs\abc.lang">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
@@ -304,19 +289,22 @@
     <Content Include="highlight\langDefs\cobol.lang">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
-    <Content Include="highlight\langDefs\coffee.lang">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
     <Content Include="highlight\langDefs\coldfusion.lang">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="highlight\langDefs\conf.lang">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
+    <Content Include="highlight\langDefs\cpp2.lang">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Include="highlight\langDefs\crk.lang">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="highlight\langDefs\cs_block_regex.lang">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="highlight\langDefs\cue.lang">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="highlight\langDefs\d.lang">
@@ -326,9 +314,6 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="highlight\langDefs\diff.lang">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-    <Content Include="highlight\langDefs\docker.lang">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="highlight\langDefs\dts.lang">
@@ -343,6 +328,9 @@
     <Content Include="highlight\langDefs\eiffel.lang">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
+    <Content Include="highlight\langDefs\elm.lang">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Include="highlight\langDefs\elixir.lang">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
@@ -355,10 +343,16 @@
     <Content Include="highlight\langDefs\express.lang">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
+    <Content Include="highlight\langDefs\factor.lang">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Include="highlight\langDefs\fame.lang">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="highlight\langDefs\fasm.lang">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="highlight\langDefs\fea.lang">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="highlight\langDefs\felix.lang">
@@ -386,6 +380,9 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="highlight\langDefs\gdscript.lang">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="highlight\langDefs\gleam.lang">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="highlight\langDefs\go.lang">
@@ -490,9 +487,6 @@
     <Content Include="highlight\langDefs\luban.lang">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
-    <Content Include="highlight\langDefs\make.lang">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
     <Content Include="highlight\langDefs\maple.lang">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
@@ -502,10 +496,10 @@
     <Content Include="highlight\langDefs\maya.lang">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
-    <Content Include="highlight\langDefs\md.lang">
+    <Content Include="highlight\langDefs\mercury.lang">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
-    <Content Include="highlight\langDefs\mercury.lang">
+    <Content Include="highlight\langDefs\miniscript.lang">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="highlight\langDefs\miranda.lang">
@@ -518,6 +512,9 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="highlight\langDefs\modelica.lang">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="highlight\langDefs\mojo.lang">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="highlight\langDefs\moon.lang">
@@ -628,9 +625,6 @@
     <Content Include="highlight\langDefs\ps.lang">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
-    <Content Include="highlight\langDefs\ps1.lang">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
     <Content Include="highlight\langDefs\psl.lang">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
@@ -673,9 +667,6 @@
     <Content Include="highlight\langDefs\rpl.lang">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
-    <Content Include="highlight\langDefs\rs.lang">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
     <Content Include="highlight\langDefs\s.lang">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
@@ -689,9 +680,6 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="highlight\langDefs\scss.lang">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-    <Content Include="highlight\langDefs\sh.lang">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="highlight\langDefs\small.lang">
@@ -739,9 +727,6 @@
     <Content Include="highlight\langDefs\tex.lang">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
-    <Content Include="highlight\langDefs\ts.lang">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
     <Content Include="highlight\langDefs\tsql.lang">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
@@ -752,6 +737,9 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="highlight\langDefs\upc.lang">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="highlight\langDefs\v.lang">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="highlight\langDefs\vala.lang">
@@ -779,6 +767,9 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="highlight\langDefs\yaml.lang">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="highlight\langDefs\yaml_ansible.lang">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="highlight\langDefs\yang.lang">
@@ -946,6 +937,9 @@
     <Content Include="highlight\themes\denim.theme">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
+    <Content Include="highlight\themes\diff.theme">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Include="highlight\themes\duotone-dark-earth.theme">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
@@ -1007,9 +1001,6 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="highlight\themes\ekvoli.theme">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-    <Content Include="highlight\themes\fine_blue.theme">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="highlight\themes\freya.theme">
@@ -1213,9 +1204,6 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="highlight\langDefs\java.lang">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-    <Content Include="highlight\langDefs\js.lang">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="highlight\langDefs\perl.lang">
