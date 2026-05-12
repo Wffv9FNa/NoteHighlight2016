@@ -20,9 +20,11 @@ namespace NoteHighlightAddin.Preview
     public partial class PreviewPane : UserControl
     {
         private const int DebounceMs = 300;
+        private const int IndicatorDelayMs = 500;
 
         private readonly SynchronizationContext _uiContext;
         private readonly Timer _debounceTimer;
+        private readonly Timer _indicatorTimer;
 
         private string _sessionTempDir;
         private int _renderSeq;
@@ -47,6 +49,35 @@ namespace NoteHighlightAddin.Preview
 
             _debounceTimer = new Timer { Interval = DebounceMs };
             _debounceTimer.Tick += DebounceTimer_Tick;
+
+            // Indicator timer: started when a render is dispatched, fires once
+            // after IndicatorDelayMs to reveal the "rendering..." label. The
+            // tick handler stops the timer so it does not fire repeatedly; the
+            // label is hidden again on apply, cancel, or error.
+            _indicatorTimer = new Timer { Interval = IndicatorDelayMs };
+            _indicatorTimer.Tick += IndicatorTimer_Tick;
+        }
+
+        private void IndicatorTimer_Tick(object sender, EventArgs e)
+        {
+            _indicatorTimer.Stop();
+            if (IsDisposed) return;
+            if (lblRendering != null) lblRendering.Visible = true;
+        }
+
+        private void StartIndicatorCountdown()
+        {
+            // Restart the 500 ms countdown. If a render completes faster than
+            // this it never appears; if it overruns, the tick handler reveals
+            // the label.
+            _indicatorTimer.Stop();
+            _indicatorTimer.Start();
+        }
+
+        private void HideIndicator()
+        {
+            _indicatorTimer.Stop();
+            if (lblRendering != null && lblRendering.Visible) lblRendering.Visible = false;
         }
 
         /// <summary>
@@ -111,6 +142,12 @@ namespace NoteHighlightAddin.Preview
             _renderCts = myCts;
             CancellationToken token = myCts.Token;
 
+            // Start (or restart) the 500 ms indicator countdown. If this render
+            // completes within 500 ms the label is never shown; if it overruns,
+            // the tick handler reveals the label. Restarting on every dispatch
+            // means continuous typing does not show the indicator at all.
+            StartIndicatorCountdown();
+
             // GenerateHighLight builds its input/output paths from
             // Path.GetTempPath() + parameters.FileName. Compute the FileName
             // up front so we can best-effort delete the output file from the
@@ -160,6 +197,14 @@ namespace NoteHighlightAddin.Preview
                     // after the existence check.
                     try { if (File.Exists(expectedOutputPath)) File.Delete(expectedOutputPath); } catch { }
                     try { if (scratchPath != null && File.Exists(scratchPath)) File.Delete(scratchPath); } catch { }
+                    // Hide the indicator if no fresher render has started. If
+                    // one has, the new render's StartIndicatorCountdown call
+                    // already governs visibility - leave it alone.
+                    _uiContext.Post(_ =>
+                    {
+                        if (IsDisposed) return;
+                        if (mySeq == _renderSeq) HideIndicator();
+                    }, null);
                     return;
                 }
                 catch
@@ -167,6 +212,11 @@ namespace NoteHighlightAddin.Preview
                     // Phase 2.6 will surface errors into the pane. For Phase 1
                     // we silently leave the previous render on screen.
                     try { if (scratchPath != null && File.Exists(scratchPath)) File.Delete(scratchPath); } catch { }
+                    _uiContext.Post(_ =>
+                    {
+                        if (IsDisposed) return;
+                        if (mySeq == _renderSeq) HideIndicator();
+                    }, null);
                     return;
                 }
                 finally
@@ -182,6 +232,7 @@ namespace NoteHighlightAddin.Preview
                 {
                     if (mySeq != _renderSeq) return;
                     if (IsDisposed) return;
+                    HideIndicator();
                     browser.DocumentText = wrapped;
                 }, null);
             });
@@ -195,6 +246,12 @@ namespace NoteHighlightAddin.Preview
                 {
                     try { _debounceTimer.Stop(); } catch { }
                     try { _debounceTimer.Dispose(); } catch { }
+                }
+
+                if (_indicatorTimer != null)
+                {
+                    try { _indicatorTimer.Stop(); } catch { }
+                    try { _indicatorTimer.Dispose(); } catch { }
                 }
 
                 // Cancel any in-flight render so the worker task does not
