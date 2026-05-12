@@ -235,7 +235,7 @@ namespace NoteHighlightAddin
             return this.DarkMode;
         }
 
-        public void cbDarkMOde_OnAction(IRibbonControl control, bool isPressed)
+        public void cbDarkMode_OnAction(IRibbonControl control, bool isPressed)
         {
             this.DarkMode = isPressed;
             NoteHighlightForm.Properties.Settings.Default.DarkMode = this.DarkMode;
