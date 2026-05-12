@@ -403,11 +403,51 @@ namespace NoteHighlightAddin
 
                 NativeMethods.SetForegroundWindow(this.Handle);
 
-                ApplySavedSplitterDistance();
+                ApplySavedPreviewVisibility();
+                if (!this.splitContainer.Panel2Collapsed)
+                {
+                    ApplySavedSplitterDistance();
+                }
 
                 this.BeginInvoke(new Action(SchedulePreview));
             }
 
+        }
+
+        /// <summary>
+        /// Reads the persisted preview-visibility flag and applies it to the SplitContainer.
+        /// Must be called before ApplySavedSplitterDistance: when Panel2Collapsed is true the
+        /// splitter distance is invalid (the framework will throw).
+        /// </summary>
+        private void ApplySavedPreviewVisibility()
+        {
+            bool visible = NoteHighlightForm.Properties.Settings.Default.MainFormPreviewVisible;
+            this.splitContainer.Panel2Collapsed = !visible;
+            UpdateTogglePreviewButtonText(visible);
+        }
+
+        private void UpdateTogglePreviewButtonText(bool previewVisible)
+        {
+            this.btnTogglePreview.Text = previewVisible ? "Hide preview" : "Show preview";
+        }
+
+        private void btnTogglePreview_Click(object sender, EventArgs e)
+        {
+            // Toggle the persisted flag, then drive Panel2Collapsed off the new value.
+            bool nowVisible = this.splitContainer.Panel2Collapsed; // collapsed -> will become visible
+            this.splitContainer.Panel2Collapsed = !nowVisible;
+            UpdateTogglePreviewButtonText(nowVisible);
+
+            NoteHighlightForm.Properties.Settings.Default.MainFormPreviewVisible = nowVisible;
+            SettingsHelper.SafeSave();
+
+            if (nowVisible)
+            {
+                // Re-showing: reapply the saved splitter distance and refresh the preview
+                // because the pane was not rendering while hidden.
+                ApplySavedSplitterDistance();
+                SchedulePreview();
+            }
         }
 
         private void PickColorToolStripMenuItem_Click(object sender, EventArgs e)

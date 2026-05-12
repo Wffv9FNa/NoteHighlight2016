@@ -39,6 +39,7 @@
             this.panel1 = new System.Windows.Forms.Panel();
             this.panel2 = new System.Windows.Forms.Panel();
             this.btnBackground = new System.Windows.Forms.Button();
+            this.btnTogglePreview = new System.Windows.Forms.Button();
             this.panel3 = new System.Windows.Forms.Panel();
             this.colorDialog1 = new System.Windows.Forms.ColorDialog();
             this.contextMenuStrip1 = new System.Windows.Forms.ContextMenuStrip();
@@ -140,6 +141,7 @@
             // 
             // panel2
             // 
+            this.panel2.Controls.Add(this.btnTogglePreview);
             this.panel2.Controls.Add(this.btnBackground);
             this.panel2.Controls.Add(this.btnCodeHighLight);
             this.panel2.Dock = System.Windows.Forms.DockStyle.Bottom;
@@ -158,6 +160,18 @@
             this.btnBackground.Text = "Box Color";
             this.btnBackground.UseVisualStyleBackColor = true;
             this.btnBackground.Click += new System.EventHandler(this.btnBackground_Click);
+            //
+            // btnTogglePreview
+            //
+            this.btnTogglePreview.AccessibleName = "Toggle preview pane";
+            this.btnTogglePreview.Location = new System.Drawing.Point(94, 2);
+            this.btnTogglePreview.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.btnTogglePreview.Name = "btnTogglePreview";
+            this.btnTogglePreview.Size = new System.Drawing.Size(100, 41);
+            this.btnTogglePreview.TabIndex = 2;
+            this.btnTogglePreview.Text = "Hide preview";
+            this.btnTogglePreview.UseVisualStyleBackColor = true;
+            this.btnTogglePreview.Click += new System.EventHandler(this.btnTogglePreview_Click);
             //
             // panel3
             //
@@ -262,6 +276,7 @@
         private System.Windows.Forms.Panel panel2;
         private System.Windows.Forms.Panel panel3;
         private System.Windows.Forms.Button btnBackground;
+        private System.Windows.Forms.Button btnTogglePreview;
         private System.Windows.Forms.ColorDialog colorDialog1;
         private System.Windows.Forms.ContextMenuStrip contextMenuStrip1;
         private System.Windows.Forms.ToolStripMenuItem pickColorToolStripMenuItem;

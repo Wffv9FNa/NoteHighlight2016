@@ -176,9 +176,46 @@ public static class FibDemo
 
             NativeMethods.SetForegroundWindow(this.Handle);
 
-            ApplySavedSplitterDistance();
+            ApplySavedPreviewVisibility();
+            if (!this.splitContainer.Panel2Collapsed)
+            {
+                ApplySavedSplitterDistance();
+            }
 
             this.BeginInvoke(new Action(SchedulePreview));
+        }
+
+        /// <summary>
+        /// Reads the persisted preview-visibility flag and applies it. Must be called before
+        /// ApplySavedSplitterDistance: when Panel2Collapsed is true the splitter distance is
+        /// invalid (the SplitContainer will throw if its constraints can't be honoured).
+        /// </summary>
+        private void ApplySavedPreviewVisibility()
+        {
+            bool visible = NoteHighlightForm.Properties.Settings.Default.SettingsFormPreviewVisible;
+            this.splitContainer.Panel2Collapsed = !visible;
+            UpdateTogglePreviewButtonText(visible);
+        }
+
+        private void UpdateTogglePreviewButtonText(bool previewVisible)
+        {
+            this.btnTogglePreview.Text = previewVisible ? "Hide preview" : "Show preview";
+        }
+
+        private void btnTogglePreview_Click(object sender, EventArgs e)
+        {
+            bool nowVisible = this.splitContainer.Panel2Collapsed; // collapsed -> will become visible
+            this.splitContainer.Panel2Collapsed = !nowVisible;
+            UpdateTogglePreviewButtonText(nowVisible);
+
+            NoteHighlightForm.Properties.Settings.Default.SettingsFormPreviewVisible = nowVisible;
+            SettingsHelper.SafeSave();
+
+            if (nowVisible)
+            {
+                ApplySavedSplitterDistance();
+                SchedulePreview();
+            }
         }
 
         private void SettingsForm_FormClosed(object sender, FormClosedEventArgs e)

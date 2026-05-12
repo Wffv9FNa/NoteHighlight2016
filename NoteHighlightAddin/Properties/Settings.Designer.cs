@@ -178,5 +178,35 @@ namespace NoteHighlightForm.Properties {
                 this["SettingsFormPreviewSplitter"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool MainFormPreviewVisible
+        {
+            get
+            {
+                return (bool)(this["MainFormPreviewVisible"]);
+            }
+            set
+            {
+                this["MainFormPreviewVisible"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool SettingsFormPreviewVisible
+        {
+            get
+            {
+                return (bool)(this["SettingsFormPreviewVisible"]);
+            }
+            set
+            {
+                this["SettingsFormPreviewVisible"] = value;
+            }
+        }
     }
 }
