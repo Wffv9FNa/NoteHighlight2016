@@ -33,16 +33,13 @@ namespace NoteHighlightAddin
 
         private bool IsClipboard { get { return this.cbx_Clipboard.Checked; } }
 
-        private Color BackgroundColor { get { return this.btnBackground.BackColor; } }
+        private Color BackgroundColor => this.btnBackground.BackColor;
 
-        public HighLightParameter Parameters { get { return _parameters; } }
+        public HighLightParameter Parameters => _parameters;
 
-        private bool _quickStyle;
+        private readonly bool _quickStyle;
 
-        public bool DarkMode { get { return _darkMode; } }
-
-        [System.Runtime.InteropServices.DllImport("user32.dll")]
-        private static extern bool SetForegroundWindow(IntPtr hWnd);
+        public bool DarkMode => _darkMode;
 
         #endregion
 
@@ -315,7 +312,7 @@ namespace NoteHighlightAddin
                 this.WindowState = FormWindowState.Minimized;
                 this.WindowState = FormWindowState.Normal;
 
-                SetForegroundWindow(this.Handle);
+                NativeMethods.SetForegroundWindow(this.Handle);
             }
 
         }

@@ -33,7 +33,6 @@ namespace NoteHighlightAddin
 {
 	[ComVisible(true)]
 	[Guid("4C6B0362-F139-417F-9661-3663C268B9E9"), ProgId("NoteHighlight2016.AddIn")]
-
 	public class AddIn : IDTExtensibility2, IRibbonExtensibility
 	{
 		protected Application OneNoteApplication

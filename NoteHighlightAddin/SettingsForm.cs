@@ -2,15 +2,12 @@
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
+using Helper;
 
 namespace NoteHighlightAddin
 {
     public partial class SettingsForm : Form
     {
-
-        [System.Runtime.InteropServices.DllImport("user32.dll")]
-        private static extern bool SetForegroundWindow(IntPtr hWnd);
-
         public SettingsForm()
         {
             InitializeComponent();
@@ -51,7 +48,7 @@ namespace NoteHighlightAddin
             this.WindowState = FormWindowState.Minimized;
             this.WindowState = FormWindowState.Normal;
 
-            SetForegroundWindow(this.Handle);
+            NativeMethods.SetForegroundWindow(this.Handle);
         }
     }
 }
