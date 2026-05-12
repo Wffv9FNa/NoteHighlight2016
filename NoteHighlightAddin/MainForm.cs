@@ -62,6 +62,32 @@ namespace NoteHighlightAddin
                 this.ShowInTaskbar = false;
             }
 
+            _previewPane.QuickStyleSuppress = _quickStyle;
+
+            this.txtCode.TextChanged += (s, e) => SchedulePreview();
+            this.cbx_style.SelectedIndexChanged += (s, e) => SchedulePreview();
+            this.cbx_lineNumber.CheckedChanged += (s, e) => SchedulePreview();
+            this.btnBackground.BackColorChanged += (s, e) => SchedulePreview();
+        }
+
+        private void SchedulePreview()
+        {
+            if (_quickStyle) return;
+            if (_previewPane == null) return;
+
+            var parameters = new HighLightParameter()
+            {
+                FileName = _fileName,
+                Content = CodeContent,
+                CodeType = _codeType,
+                HighLightStyle = CodeStyle,
+                ShowLineNumber = IsShowLineNumber,
+                HighlightColor = BackgroundColor,
+                Font = NoteHighlightForm.Properties.Settings.Default.Font,
+                FontSize = NoteHighlightForm.Properties.Settings.Default.FontSize
+            };
+
+            _previewPane.Render(parameters, this.DarkMode);
         }
 
         private void LoadThemes()
@@ -117,6 +143,7 @@ namespace NoteHighlightAddin
         /// </summary>
         private void CodeForm_FormClosed(object sender, FormClosedEventArgs e)
         {
+            _previewPane?.Dispose();
             SaveSetting();
         }
 
@@ -313,6 +340,8 @@ namespace NoteHighlightAddin
                 this.WindowState = FormWindowState.Normal;
 
                 NativeMethods.SetForegroundWindow(this.Handle);
+
+                this.BeginInvoke(new Action(SchedulePreview));
             }
 
         }

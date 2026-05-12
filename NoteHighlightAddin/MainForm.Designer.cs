@@ -44,10 +44,16 @@
             this.contextMenuStrip1 = new System.Windows.Forms.ContextMenuStrip();
             this.pickColorToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.transparentToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.splitContainer = new System.Windows.Forms.SplitContainer();
+            this._previewPane = new NoteHighlightAddin.Preview.PreviewPane();
             this.panel1.SuspendLayout();
             this.panel2.SuspendLayout();
             this.panel3.SuspendLayout();
             this.contextMenuStrip1.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.splitContainer)).BeginInit();
+            this.splitContainer.Panel1.SuspendLayout();
+            this.splitContainer.Panel2.SuspendLayout();
+            this.splitContainer.SuspendLayout();
             this.SuspendLayout();
             // 
             // btnCodeHighLight
@@ -152,15 +158,43 @@
             this.btnBackground.Text = "Box Color";
             this.btnBackground.UseVisualStyleBackColor = true;
             this.btnBackground.Click += new System.EventHandler(this.btnBackground_Click);
-            // 
+            //
             // panel3
-            // 
-            this.panel3.Controls.Add(this.txtCode);
+            //
+            this.panel3.Controls.Add(this.splitContainer);
             this.panel3.Dock = System.Windows.Forms.DockStyle.Fill;
             this.panel3.Location = new System.Drawing.Point(0, 53);
             this.panel3.Name = "panel3";
             this.panel3.Size = new System.Drawing.Size(517, 380);
             this.panel3.TabIndex = 0;
+            //
+            // splitContainer
+            //
+            this.splitContainer.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.splitContainer.Location = new System.Drawing.Point(0, 0);
+            this.splitContainer.Name = "splitContainer";
+            this.splitContainer.Orientation = System.Windows.Forms.Orientation.Vertical;
+            //
+            // splitContainer.Panel1
+            //
+            this.splitContainer.Panel1.Controls.Add(this.txtCode);
+            this.splitContainer.Panel1MinSize = 200;
+            //
+            // splitContainer.Panel2
+            //
+            this.splitContainer.Panel2.Controls.Add(this._previewPane);
+            this.splitContainer.Panel2MinSize = 200;
+            this.splitContainer.Size = new System.Drawing.Size(517, 380);
+            this.splitContainer.SplitterDistance = 310;
+            this.splitContainer.TabIndex = 0;
+            //
+            // _previewPane
+            //
+            this._previewPane.Dock = System.Windows.Forms.DockStyle.Fill;
+            this._previewPane.Location = new System.Drawing.Point(0, 0);
+            this._previewPane.Name = "_previewPane";
+            this._previewPane.QuickStyleSuppress = false;
+            this._previewPane.TabIndex = 0;
             // 
             // contextMenuStrip1
             // 
@@ -203,6 +237,10 @@
             this.panel1.ResumeLayout(false);
             this.panel1.PerformLayout();
             this.panel2.ResumeLayout(false);
+            this.splitContainer.Panel1.ResumeLayout(false);
+            this.splitContainer.Panel2.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)(this.splitContainer)).EndInit();
+            this.splitContainer.ResumeLayout(false);
             this.panel3.ResumeLayout(false);
             this.contextMenuStrip1.ResumeLayout(false);
             this.ResumeLayout(false);
@@ -226,5 +264,7 @@
         private System.Windows.Forms.ContextMenuStrip contextMenuStrip1;
         private System.Windows.Forms.ToolStripMenuItem pickColorToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem transparentToolStripMenuItem;
+        private System.Windows.Forms.SplitContainer splitContainer;
+        private NoteHighlightAddin.Preview.PreviewPane _previewPane;
     }
 }
