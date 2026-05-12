@@ -122,8 +122,6 @@ namespace NoteHighlightAddin
             this.btnBackground.BackColor = NoteHighlightForm.Properties.Settings.Default.BackgroundColor;
             this.cbx_Clipboard.Checked = NoteHighlightForm.Properties.Settings.Default.SaveOnClipboard;
             this.cbx_lineNumber.Checked = NoteHighlightForm.Properties.Settings.Default.ShowLineNumber;
-            //this.TopMost = true;
-            //this.TopMost = false;
         }
 
         /// <summary>

@@ -478,16 +478,6 @@ namespace NoteHighlightAddin
         /// <returns></returns>
         public IStream GetImage(string imageName)
 		{
-            //switch (imageName)
-            //{
-            //    case "CSharp.png":
-            //        Properties.Resources.CSharp.Save(imageStream, ImageFormat.Png);
-            //        break;
-            //    default:
-            //        Properties.Resources.Logo.Save(imageStream, ImageFormat.Png);
-            //        break;
-            //}
-
             BindingFlags flags = BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
 
             // H7: null-guard the reflected resource lookup. If the resource is missing
@@ -618,18 +608,6 @@ namespace NoteHighlightAddin
             var node = pageRoot.Descendants(ns + "Outline")
                                .Where(n => n.Attribute("selected") != null && (n.Attribute("selected").Value == "all" || n.Attribute("selected").Value == "partial"))
                                .FirstOrDefault();
-            //if (node != null)
-            //{
-            //    var attrPos = node.Descendants(ns + "Position").FirstOrDefault();
-            //    if (attrPos != null)
-            //    {
-            //        var x = attrPos.Attribute("x").Value;
-            //        var y = attrPos.Attribute("y").Value;
-            //        return new string[] { x, y };
-            //    }
-            //}
-            //return null;
-
             return node;
         }
 
@@ -746,7 +724,6 @@ namespace NoteHighlightAddin
                 {
                     outline.Descendants(ns + "Table").Where(n => n.Attribute("selected") != null &&
                                         (n.Attribute("selected").Value == "all" || n.Attribute("selected").Value == "partial")).FirstOrDefault().ReplaceWith(children.Descendants(ns + "Table").FirstOrDefault());
-                    //outline.Descendants().Where(n => n.Attribute("selected") != null && n.Attribute("selected").Value == "all").Remove();
                 }
                 else
                 {
@@ -895,8 +872,6 @@ namespace NoteHighlightAddin
                         itemLine = item;
                     }
 
-                    //string nr = string.Format(@"<body style=""font-family:{0}"">", GenerateHighlightContent.GenerateHighLight.Config.OutputArguments["Font"].Value) +
-                    //        itemNr.Replace("&apos;", "'") + "</body>";
                     string nr = "";
                     if (string.IsNullOrEmpty(config.LineNrReplaceCh))
                     {
@@ -923,9 +898,6 @@ namespace NoteHighlightAddin
                 {
                     itemLine = item;
                 }
-                //string s = item.Replace(@"style=""", string.Format(@"style=""font-family:{0}; ", GenerateHighlightContent.GenerateHighLight.Config.OutputArguments["Font"].Value));
-                //string s = string.Format(@"<body style=""font-family:{0}"">", GenerateHighlightContent.GenerateHighLight.Config.OutputArguments["Font"].Value) + 
-                //            itemLine.Replace("&apos;", "'") + "</body>";
                 string s = defaultStyle + itemLine.Replace("&apos;", "'") + "</pre>";
 
                 cell2.Add(new XElement(ns + "OEChildren",
