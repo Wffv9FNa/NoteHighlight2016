@@ -63,10 +63,11 @@ namespace UnitTesting
             HighLightSection config = configuration.GetSection("HighLightSection") as HighLightSection;
 
             bool selectedTextFormated = false;
-            addIn.GetSelectedText(Resource1.Page2, out selectedTextFormated);
+            var page2Root = XDocument.Parse(Resource1.Page2).Root;
+            addIn.GetSelectedText(page2Root, out selectedTextFormated);
 
 
-                XDocument output = addIn.InsertHighLightCode(htmlCode, pos, param, outline, config, selectedTextFormated, addIn.IsSelectedTextInline(Resource1.Page2));
+                XDocument output = addIn.InsertHighLightCode(htmlCode, pos, param, outline, config, selectedTextFormated, addIn.IsSelectedTextInline(page2Root));
 
             Assert.AreEqual(Resource1.Output2, output.ToString(), false);
         }
@@ -95,10 +96,11 @@ namespace UnitTesting
             HighLightSection config = configuration.GetSection("HighLightSection") as HighLightSection;
 
             bool selectedTextFormated = false;
-            addIn.GetSelectedText(Resource1.Page5, out selectedTextFormated);
+            var page5Root = XDocument.Parse(Resource1.Page5).Root;
+            addIn.GetSelectedText(page5Root, out selectedTextFormated);
 
 
-            XDocument output = addIn.InsertHighLightCode(htmlCode, pos, param, outline, config, selectedTextFormated, addIn.IsSelectedTextInline(Resource1.Page5));
+            XDocument output = addIn.InsertHighLightCode(htmlCode, pos, param, outline, config, selectedTextFormated, addIn.IsSelectedTextInline(page5Root));
 
             Assert.AreEqual(Resource1.Output5, output.ToString(), false);
         }
@@ -127,10 +129,11 @@ namespace UnitTesting
             HighLightSection config = configuration.GetSection("HighLightSection") as HighLightSection;
 
             bool selectedTextFormated = false;
-            addIn.GetSelectedText(Resource1.Page3, out selectedTextFormated);
+            var page3Root = XDocument.Parse(Resource1.Page3).Root;
+            addIn.GetSelectedText(page3Root, out selectedTextFormated);
 
 
-            XDocument output = addIn.InsertHighLightCode(htmlCode, pos, param, outline, config, selectedTextFormated, addIn.IsSelectedTextInline(Resource1.Page3));
+            XDocument output = addIn.InsertHighLightCode(htmlCode, pos, param, outline, config, selectedTextFormated, addIn.IsSelectedTextInline(page3Root));
 
             Assert.AreEqual(Resource1.Output3, output.ToString(), false);
         }
@@ -159,10 +162,11 @@ namespace UnitTesting
             HighLightSection config = configuration.GetSection("HighLightSection") as HighLightSection;
 
             bool selectedTextFormated = false;
-            addIn.GetSelectedText(Resource1.Page6, out selectedTextFormated);
+            var page6Root = XDocument.Parse(Resource1.Page6).Root;
+            addIn.GetSelectedText(page6Root, out selectedTextFormated);
 
 
-            XDocument output = addIn.InsertHighLightCode(htmlCode, pos, param, outline, config, selectedTextFormated, addIn.IsSelectedTextInline(Resource1.Page6));
+            XDocument output = addIn.InsertHighLightCode(htmlCode, pos, param, outline, config, selectedTextFormated, addIn.IsSelectedTextInline(page6Root));
 
             Assert.AreEqual(Resource1.Output6, output.ToString(), false);
         }
@@ -332,10 +336,11 @@ namespace UnitTesting
             HighLightSection config = configuration.GetSection("HighLightSection") as HighLightSection;
 
             bool selectedTextFormated = false;
-            addIn.GetSelectedText(Resource1.Page4, out selectedTextFormated);
+            var page4Root = XDocument.Parse(Resource1.Page4).Root;
+            addIn.GetSelectedText(page4Root, out selectedTextFormated);
 
 
-            XDocument output = addIn.InsertHighLightCode(htmlCode, pos, param, outline, config, selectedTextFormated, addIn.IsSelectedTextInline(Resource1.Page4));
+            XDocument output = addIn.InsertHighLightCode(htmlCode, pos, param, outline, config, selectedTextFormated, addIn.IsSelectedTextInline(page4Root));
 
             Assert.AreEqual(Resource1.Output4, output.ToString(), false);
         }

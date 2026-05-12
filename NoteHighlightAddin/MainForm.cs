@@ -81,7 +81,14 @@ namespace NoteHighlightAddin
             try
             {
                 HighLightSection section = (new GenerateHighLight()).Config;
-                var workingDirectory = Path.Combine(ProcessHelper.GetDirectoryFromPath(Assembly.GetCallingAssembly().Location), section.FolderName, section.ThemeFolder);
+                // Use typeof(MainForm).Assembly rather than GetCallingAssembly():
+                // GetCallingAssembly is sensitive to JIT inlining and cross-AppDomain
+                // COM callers, so it may resolve to mscorlib or ONENOTE.EXE instead of
+                // the add-in assembly that actually ships the themes folder.
+                var assemblyLocation = typeof(MainForm).Assembly.Location;
+                if (string.IsNullOrEmpty(assemblyLocation))
+                    assemblyLocation = new Uri(typeof(MainForm).Assembly.CodeBase).LocalPath;
+                var workingDirectory = Path.Combine(ProcessHelper.GetDirectoryFromPath(assemblyLocation), section.FolderName, section.ThemeFolder);
 
                 string[] files = Directory.GetFiles(workingDirectory, "*.theme");
 

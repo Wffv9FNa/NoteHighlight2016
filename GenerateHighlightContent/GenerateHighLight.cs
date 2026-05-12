@@ -39,7 +39,17 @@ namespace GenerateHighlightContent
 
         public GenerateHighLight()
         {
-            Configuration c = ConfigurationManager.OpenExeConfiguration(Assembly.GetCallingAssembly().Location);
+            // Use the defining assembly rather than GetCallingAssembly(): the latter
+            // can resolve to mscorlib (shadow-copied) or the host process under
+            // cross-AppDomain COM activation, in which case OpenExeConfiguration would
+            // look for the wrong .config file. The current call only worked because
+            // the JIT happened to inline this constructor into its caller.
+            // Note: a richer FileNotFoundException with the resolved path is tracked
+            // separately under M3; H6 deliberately keeps the minimum churn here.
+            var assemblyLocation = typeof(GenerateHighLight).Assembly.Location;
+            if (string.IsNullOrEmpty(assemblyLocation))
+                assemblyLocation = new Uri(typeof(GenerateHighLight).Assembly.CodeBase).LocalPath;
+            Configuration c = ConfigurationManager.OpenExeConfiguration(assemblyLocation);
             _section = c.GetSection("HighLightSection") as HighLightSection;
         }
 
@@ -56,7 +66,13 @@ namespace GenerateHighlightContent
             if (_section == null)
                 throw new FileNotFoundException("ConfigurationManager.GetSection(\"HighLightSection\") failed!");
 
-            var workingDirectory = Path.Combine(ProcessHelper.GetDirectoryFromPath(Assembly.GetCallingAssembly().Location), _section.FolderName);
+            // typeof(GenerateHighLight).Assembly avoids the JIT-inlining sensitivity
+            // of GetCallingAssembly() (see H6); fall back to CodeBase for the
+            // load-from-byte-array case where Location returns string.Empty.
+            var assemblyLocation = typeof(GenerateHighLight).Assembly.Location;
+            if (string.IsNullOrEmpty(assemblyLocation))
+                assemblyLocation = new Uri(typeof(GenerateHighLight).Assembly.CodeBase).LocalPath;
+            var workingDirectory = Path.Combine(ProcessHelper.GetDirectoryFromPath(assemblyLocation), _section.FolderName);
 
             // Reject any value that could break out of the quoted argument or inject a new
             // highlight.exe switch (e.g. --plug-in=evil.lua). highlight.exe supports Lua

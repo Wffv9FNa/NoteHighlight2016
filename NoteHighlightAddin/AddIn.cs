@@ -85,7 +85,16 @@ namespace NoteHighlightAddin
             try
             {
 
-                var workingDirectory = Path.Combine(ProcessHelper.GetDirectoryFromPath(Assembly.GetCallingAssembly().Location), "ribbon.xml");
+                // Use the defining assembly (typeof(AddIn).Assembly) rather than
+                // GetCallingAssembly(): the latter resolves to whichever assembly
+                // happens to call GetCustomUI - under cross-AppDomain COM activation
+                // that is mscorlib (shadow-copied path) or ONENOTE.EXE itself, neither
+                // of which sit next to ribbon.xml. The current call only works because
+                // the JIT inlines this helper into the COM entry point.
+                var assemblyLocation = typeof(AddIn).Assembly.Location;
+                if (string.IsNullOrEmpty(assemblyLocation))
+                    assemblyLocation = new Uri(typeof(AddIn).Assembly.CodeBase).LocalPath;
+                var workingDirectory = Path.Combine(ProcessHelper.GetDirectoryFromPath(assemblyLocation), "ribbon.xml");
 
                 string file = File.ReadAllText(workingDirectory);
 
@@ -296,19 +305,34 @@ namespace NoteHighlightAddin
             try
             {
                 var pageNode = GetPageNode();
-                string pageXml = null;
+                XElement pageRoot = null;
                 string selectedText = "";
                 XElement outline = null;
                 bool selectedTextFormated = false;
 
                 if (pageNode != null)
                 {
-                    pageXml = GetPageXml(pageNode.Attribute("ID").Value);
-                    selectedText = GetSelectedText(pageXml, out selectedTextFormated);
+                    string pageXml = GetPageXml(pageNode.Attribute("ID").Value);
+
+                    // H9: parse the page XML once and share the parsed root with every helper that
+                    // needs it. OneNote can return zero-length XML or HTML error fragments mid-sync,
+                    // so a parse failure aborts the operation silently rather than bubbling a stack
+                    // trace through a MessageBox on this worker STA.
+                    try
+                    {
+                        pageRoot = XDocument.Parse(pageXml).Root;
+                    }
+                    catch (System.Xml.XmlException xex)
+                    {
+                        System.Diagnostics.Trace.TraceWarning("NoteHighlight2016: could not parse page XML in ShowForm; aborting. " + xex.Message);
+                        return;
+                    }
+
+                    selectedText = GetSelectedText(pageRoot, out selectedTextFormated);
 
                     if (selectedText.Trim() != "")
                     {
-                        outline = GetOutline(pageXml);
+                        outline = GetOutline(pageRoot);
                     }
                 }
 
@@ -341,12 +365,14 @@ namespace NoteHighlightAddin
 
                 if (File.Exists(htmlOutputPath))
                 {
-                    InsertHighLightCodeToCurrentSide(htmlOutputPath, pageXml, form.Parameters, outline, selectedTextFormated);
+                    InsertHighLightCodeToCurrentSide(htmlOutputPath, pageRoot, form.Parameters, outline, selectedTextFormated);
                 }
             }
             catch (Exception e)
             {
-                MessageBox.Show("Exception from ShowForm: " + e.ToString());
+                // H9: do not surface the raw stack trace via MessageBox from the worker STA - that
+                // blocks the worker's message pump and leaves the OneNote ribbon spinning. Log it.
+                System.Diagnostics.Trace.TraceError("NoteHighlight2016: unhandled exception in ShowForm. " + e.ToString());
             }
             finally
             {
@@ -416,7 +442,6 @@ namespace NoteHighlightAddin
         /// <returns></returns>
         public IStream GetImage(string imageName)
 		{
-			MemoryStream imageStream = new MemoryStream();
             //switch (imageName)
             //{
             //    case "CSharp.png":
@@ -429,8 +454,36 @@ namespace NoteHighlightAddin
 
             BindingFlags flags = BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
 
-            var b = typeof(Properties.Resources).GetProperty(imageName.Substring(0, imageName.IndexOf('.')), flags).GetValue(null, null) as Bitmap;
-            b.Save(imageStream, ImageFormat.Png);
+            // H7: null-guard the reflected resource lookup. If the resource is missing
+            // (e.g. someone added a button referencing an image that was not embedded),
+            // return null so Office falls back to a default icon rather than crashing the
+            // whole ribbon with "An error occurred while creating the ribbon".
+            string propertyName = imageName.Substring(0, imageName.IndexOf('.'));
+            PropertyInfo prop = typeof(Properties.Resources).GetProperty(propertyName, flags);
+            if (prop == null)
+            {
+                System.Diagnostics.Trace.TraceWarning("NoteHighlight2016: ribbon image resource '" + propertyName + "' not found.");
+                return null;
+            }
+
+            // H7: dispose the source Bitmap deterministically after Save - the PNG bytes
+            // have already been serialised into the MemoryStream, so disposing the bitmap
+            // does not affect the stream content.
+            MemoryStream imageStream = new MemoryStream();
+            using (Bitmap b = prop.GetValue(null, null) as Bitmap)
+            {
+                if (b == null)
+                {
+                    System.Diagnostics.Trace.TraceWarning("NoteHighlight2016: ribbon image resource '" + propertyName + "' is not a Bitmap.");
+                    imageStream.Dispose();
+                    return null;
+                }
+                b.Save(imageStream, ImageFormat.Png);
+            }
+
+            // H7: Bitmap.Save leaves Position at end-of-stream; rewind so callers that
+            // read from the current position (rather than Seek to 0) receive the PNG.
+            imageStream.Position = 0;
 
             return new CCOMStreamWrapper(imageStream);
 		}
@@ -439,7 +492,7 @@ namespace NoteHighlightAddin
         /// 插入 HighLight Code 至滑鼠游標的位置
         /// Insert HighLight Code To Mouse Position  
         /// </summary>
-        private void InsertHighLightCodeToCurrentSide(string fileName, string pageXml, HighLightParameter parameters, XElement outline, bool selectedTextFormated)
+        private void InsertHighLightCodeToCurrentSide(string fileName, XElement pageRoot, HighLightParameter parameters, XElement outline, bool selectedTextFormated)
         {
             try
             {
@@ -457,14 +510,14 @@ namespace NoteHighlightAddin
                     string[] position = null;
                     if (outline == null)
                     {
-                        position = GetMousePointPosition(pageXml);
+                        position = GetMousePointPosition(pageRoot);
                     }
 
-                    var page = InsertHighLightCode(htmlContent, position, parameters, outline, (new GenerateHighLight()).Config, selectedTextFormated, IsSelectedTextInline(pageXml));
+                    var page = InsertHighLightCode(htmlContent, position, parameters, outline, (new GenerateHighLight()).Config, selectedTextFormated, IsSelectedTextInline(pageRoot));
                     page.Root.SetAttributeValue("ID", existingPageId);
 
                     //Bug fix - remove overflow value for Indents
-                    foreach (var el in page.Descendants(ns + "Indent").Where(n => double.Parse(n.Attribute("indent").Value, new CultureInfo(page.Root.Attribute("lang").Value)) > 1000000))
+                    foreach (var el in page.Descendants(ns + "Indent").Where(n => n.Attribute("indent") != null && double.TryParse(n.Attribute("indent").Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var d) && d > 1e6))
                     {
                         el.Attribute("indent").Value = "0";
                     }
@@ -504,11 +557,12 @@ namespace NoteHighlightAddin
         /// 取得滑鼠所在的點
         /// Get Mouse Point
         /// </summary>
-        private string[] GetMousePointPosition(string pageXml)
+        private string[] GetMousePointPosition(XElement pageRoot)
         {
-            var node = XDocument.Parse(pageXml).Descendants(ns + "Outline")
-                                               .Where(n => n.Attribute("selected") != null && n.Attribute("selected").Value == "partial")
-                                               .FirstOrDefault();
+            if (pageRoot == null) return null;
+            var node = pageRoot.Descendants(ns + "Outline")
+                               .Where(n => n.Attribute("selected") != null && n.Attribute("selected").Value == "partial")
+                               .FirstOrDefault();
             if (node != null)
             {
                 var attrPos = node.Descendants(ns + "Position").FirstOrDefault();
@@ -522,11 +576,12 @@ namespace NoteHighlightAddin
             return null;
         }
 
-        private XElement GetOutline(string pageXml)
+        private XElement GetOutline(XElement pageRoot)
         {
-            var node = XDocument.Parse(pageXml).Descendants(ns + "Outline")
-                                               .Where(n => n.Attribute("selected") != null && (n.Attribute("selected").Value == "all" || n.Attribute("selected").Value == "partial"))
-                                               .FirstOrDefault();
+            if (pageRoot == null) return null;
+            var node = pageRoot.Descendants(ns + "Outline")
+                               .Where(n => n.Attribute("selected") != null && (n.Attribute("selected").Value == "all" || n.Attribute("selected").Value == "partial"))
+                               .FirstOrDefault();
             //if (node != null)
             //{
             //    var attrPos = node.Descendants(ns + "Position").FirstOrDefault();
@@ -550,14 +605,15 @@ namespace NoteHighlightAddin
             return pageXml;
         }
 
-        public string GetSelectedText(string pageXml, out bool selectedTextFormated)
+        public string GetSelectedText(XElement pageRoot, out bool selectedTextFormated)
         {
-            var node = XDocument.Parse(pageXml).Descendants(ns + "Outline")
-                                               .Where(n => n.Attribute("selected") != null && (n.Attribute("selected").Value == "all" || n.Attribute("selected").Value == "partial"))
-                                               .FirstOrDefault();
-            
-            StringBuilder sb = new StringBuilder();
             selectedTextFormated = false;
+            StringBuilder sb = new StringBuilder();
+            if (pageRoot == null) return sb.ToString();
+            var node = pageRoot.Descendants(ns + "Outline")
+                               .Where(n => n.Attribute("selected") != null && (n.Attribute("selected").Value == "all" || n.Attribute("selected").Value == "partial"))
+                               .FirstOrDefault();
+
             if (node != null)
             {
                 var table = node.Descendants(ns + "Table").Where(n => n.Attribute("selected") != null && (n.Attribute("selected").Value == "all" || n.Attribute("selected").Value == "partial")).FirstOrDefault();
@@ -569,7 +625,9 @@ namespace NoteHighlightAddin
                 }
                 else
                 {
-                    attrPos = table.Descendants(ns + "Cell").LastOrDefault().Descendants(ns + "T").Where(n => n.Attribute("selected") != null && n.Attribute("selected").Value == "all");
+                    attrPos = table.Descendants(ns + "Cell")
+                                   .SelectMany(c => c.Descendants(ns + "T"))
+                                   .Where(n => n.Attribute("selected")?.Value == "all");
                     selectedTextFormated = true;
                 }
                 int tabCount = 0;
@@ -592,11 +650,12 @@ namespace NoteHighlightAddin
             return sb.ToString().TrimEnd('\r','\n');
         }
 
-        public bool IsSelectedTextInline(string pageXml)
+        public bool IsSelectedTextInline(XElement pageRoot)
         {
-            var node = XDocument.Parse(pageXml).Descendants(ns + "Outline")
-                                               .Where(n => n.Attribute("selected") != null && (n.Attribute("selected").Value == "all" || n.Attribute("selected").Value == "partial"))
-                                               .FirstOrDefault();
+            if (pageRoot == null) return false;
+            var node = pageRoot.Descendants(ns + "Outline")
+                               .Where(n => n.Attribute("selected") != null && (n.Attribute("selected").Value == "all" || n.Attribute("selected").Value == "partial"))
+                               .FirstOrDefault();
 
             if (node != null)
             {
@@ -611,7 +670,16 @@ namespace NoteHighlightAddin
                                         && oeNode.Descendants(ns + "T").Where(n => n.Attribute("selected") == null || n.Attribute("selected").Value == "none").Count() > 0)
                         {
                             return true;
-                        } 
+                        }
+                    }
+                }
+                else
+                {
+                    foreach (var oeNode in table.Descendants(ns + "OE"))
+                    {
+                        var allSel = oeNode.Descendants(ns + "T").Any(n => n.Attribute("selected")?.Value == "all");
+                        var unsel  = oeNode.Descendants(ns + "T").Any(n => n.Attribute("selected") == null || n.Attribute("selected").Value == "none");
+                        if (allSel && unsel) return true;
                     }
                 }
             }

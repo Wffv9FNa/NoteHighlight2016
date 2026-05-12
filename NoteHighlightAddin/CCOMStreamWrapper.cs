@@ -10,11 +10,35 @@ using System.Runtime.InteropServices.ComTypes;
 
 namespace NoteHighlightAddin.Utilities
 {
-    class CCOMStreamWrapper : IStream
+    class CCOMStreamWrapper : IStream, IDisposable
     {
         public CCOMStreamWrapper(System.IO.Stream streamWrap)
         {
             m_stream = streamWrap;
+        }
+
+        // H7: deterministic dispose path so the wrapped MemoryStream is released when the
+        // Office COM host drops the IStream. The finaliser covers the normal Office path
+        // (RCW release runs finalisation, which disposes m_stream); Dispose() is provided
+        // for direct managed callers and suppresses the finaliser.
+        ~CCOMStreamWrapper()
+        {
+            Dispose(false);
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (m_stream != null)
+            {
+                m_stream.Dispose();
+                m_stream = null;
+            }
         }
 
         public void Clone(out IStream ppstm)
