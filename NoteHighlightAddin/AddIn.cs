@@ -64,6 +64,14 @@ namespace NoteHighlightAddin
 
         private bool DarkMode { get; set; }
 
+        // Idempotence guard for the Phase 2.4 stale-temp-dir sweep. OnConnection
+        // may legitimately fire more than once over the add-in lifetime (e.g. a
+        // host reconnect); the sweep is best-effort and only needs to run once
+        // per process. Plain int + Interlocked.CompareExchange avoids the lock
+        // and is sufficient here - OnConnection is always called on the main
+        // STA, but the sweep itself dispatches to the thread pool.
+        private static int _sweepDone;
+
         public AddIn()
 		{
 		}
@@ -192,6 +200,101 @@ namespace NoteHighlightAddin
 		public void OnConnection(object Application, ext_ConnectMode ConnectMode, object AddInInst, ref Array custom)
 		{
 			SetOneNoteApplication((Application)Application);
+
+			// Phase 2.4: best-effort cleanup of stale preview-pane temp dirs left
+			// behind by previous OneNote crashes / kills. Wrap the dispatch (not
+			// just the sweep itself) so absolutely nothing can escape into
+			// OnConnection - a throw out of this method aborts add-in load.
+			try
+			{
+				if (Interlocked.CompareExchange(ref _sweepDone, 1, 0) == 0)
+				{
+					ThreadPool.QueueUserWorkItem(_ =>
+					{
+						try { SweepStalePreviewTempDirs(TimeSpan.FromHours(24)); }
+						catch
+						{
+							// Best-effort. Never surface to the host - the worker
+							// thread has no UI context and an unhandled exception
+							// here would tear down the process under legacy
+							// CLR policy.
+						}
+					});
+				}
+			}
+			catch
+			{
+				// Defence in depth: ThreadPool.QueueUserWorkItem itself should
+				// not throw, but if it ever does we still must not break the
+				// add-in load path.
+			}
+		}
+
+		/// <summary>
+		/// Best-effort sweep of leftover per-session preview temp directories
+		/// created by <see cref="Preview.PreviewPane"/>. Each pane allocates a
+		/// directory named <c>{TempPath}\NoteHighlight2016\preview-{guid}</c>
+		/// and removes it on dispose; OneNote crashes leave them behind. We
+		/// delete only the <c>preview-*</c> children whose last-write time is
+		/// older than <paramref name="age"/>, never the parent
+		/// <c>NoteHighlight2016</c> directory itself (a live pane in another
+		/// OneNote instance may have just created one).
+		/// </summary>
+		/// <remarks>
+		/// Safe to call from any thread. All path resolution uses
+		/// <see cref="Path.GetTempPath"/> - it does not touch
+		/// <c>Assembly.GetExecutingAssembly().Location</c>, which is unsafe
+		/// under COM activation (see feedback_com_addin_path_traps.md).
+		/// Every per-directory operation is wrapped in try/catch so a single
+		/// locked / permission-denied entry cannot abort the sweep.
+		/// </remarks>
+		private static void SweepStalePreviewTempDirs(TimeSpan age)
+		{
+			string root;
+			try
+			{
+				root = Path.Combine(Path.GetTempPath(), "NoteHighlight2016");
+			}
+			catch
+			{
+				return;
+			}
+
+			if (string.IsNullOrEmpty(root)) return;
+			if (!Directory.Exists(root)) return;
+
+			string[] candidates;
+			try
+			{
+				candidates = Directory.GetDirectories(root, "preview-*", SearchOption.TopDirectoryOnly);
+			}
+			catch
+			{
+				return;
+			}
+
+			DateTime cutoffUtc = DateTime.UtcNow - age;
+
+			foreach (string dir in candidates)
+			{
+				try
+				{
+					// LastWriteTimeUtc is the most robust signal on Windows tmp
+					// dirs - CreationTimeUtc is preserved across copies/moves
+					// and can outlive the originating session. A live pane
+					// touches its files continuously so LastWriteTime tracks
+					// "in use" correctly.
+					DateTime lastWriteUtc = Directory.GetLastWriteTimeUtc(dir);
+					if (lastWriteUtc > cutoffUtc) continue;
+
+					Directory.Delete(dir, true);
+				}
+				catch
+				{
+					// Best-effort: swallow IOException, UnauthorizedAccessException,
+					// DirectoryNotFoundException (race), etc. Move on.
+				}
+			}
 		}
 
 		public void SetOneNoteApplication(Application application)
