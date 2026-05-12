@@ -207,15 +207,41 @@ namespace NoteHighlightAddin.Preview
                     }, null);
                     return;
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Phase 2.6 will surface errors into the pane. For Phase 1
-                    // we silently leave the previous render on screen.
+                    // Phase 2.6: render the failure inside the preview pane
+                    // rather than swallowing it or popping a MessageBox (which
+                    // would be modal-on-modal under the STA worker). The
+                    // exception message for InvalidOperationException thrown
+                    // by ProcessHelper embeds the captured stderr snippet, so
+                    // surfacing the message gives the user the highlight.exe
+                    // diagnostic verbatim. HTML-escaping happens inside
+                    // PreviewHtmlWrapper.BuildErrorDocument.
                     try { if (scratchPath != null && File.Exists(scratchPath)) File.Delete(scratchPath); } catch { }
+                    try { if (File.Exists(expectedOutputPath)) File.Delete(expectedOutputPath); } catch { }
+
+                    string errorDoc;
+                    try
+                    {
+                        errorDoc = PreviewHtmlWrapper.BuildErrorDocument(ex, BackColor);
+                    }
+                    catch
+                    {
+                        // BuildErrorDocument is defensive but never trust a
+                        // formatter on the failure path. Fall back to a
+                        // minimal static document so the user still sees that
+                        // a render failed.
+                        errorDoc = "<!DOCTYPE html><html><head><meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\"></head><body><pre>Preview render failed.</pre></body></html>";
+                    }
+
                     _uiContext.Post(_ =>
                     {
                         if (IsDisposed) return;
-                        if (mySeq == _renderSeq) HideIndicator();
+                        // Seq-gate: a stale error must not overwrite a fresher
+                        // good render that has since landed.
+                        if (mySeq != _renderSeq) return;
+                        HideIndicator();
+                        try { browser.DocumentText = errorDoc; } catch { }
                     }, null);
                     return;
                 }
