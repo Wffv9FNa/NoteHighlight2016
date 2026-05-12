@@ -3,16 +3,12 @@ using Helper;
 using ICSharpCode.TextEditor.Document;
 using NoteHighLightForm;
 using System;
-using System.Collections.Generic;
-using System.ComponentModel;
 using System.Configuration;
-using System.Data;
 using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace NoteHighlightAddin
