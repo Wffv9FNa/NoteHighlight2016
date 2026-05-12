@@ -37,8 +37,7 @@ namespace Helper
         private const int MaxCapturedStderrChars = 4096;
 
         /// <summary>
-        /// 取得組件所在路徑
-        /// Get Assembly Location
+        /// Get Assembly Location.
         /// </summary>
         public static string GetAssemblyLocationDirectory
         {

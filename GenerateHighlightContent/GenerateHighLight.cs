@@ -29,7 +29,7 @@ namespace GenerateHighlightContent
 
         public int FontSize { get; set; }
 
-        /// <summary> highlight.exe 參數 設定於 App.config 的 HighLightSection 區塊 </summary>
+        /// <summary> highlight.exe arguments configured in the HighLightSection block of App.config. </summary>
         private HighLightSection _section;
 
         /// <summary>
@@ -127,8 +127,8 @@ namespace GenerateHighlightContent
             return Path.GetDirectoryName(path);
         }
 
-        /// <summary> 呼叫highlight.exe 產生高亮後的html </summary>
-        /// <returns>回傳 Html 所在的路徑</returns>
+        /// <summary> Invoke highlight.exe to produce the highlighted HTML. </summary>
+        /// <returns>The path to the generated HTML file.</returns>
         public string GenerateHighLightCode(HighLightParameter parameter)
         {
             InitParameter(parameter);
@@ -230,7 +230,7 @@ namespace GenerateHighlightContent
             }
         }
 
-        /// <summary> 初始化參數 </summary>
+        /// <summary> Initialise parameters. </summary>
         private void InitParameter(HighLightParameter parameter)
         {
             Content = parameter.Content;
@@ -242,7 +242,7 @@ namespace GenerateHighlightContent
             FontSize = parameter.FontSize;
         }
 
-        /// <summary> 產生HighLight.exe 所需的參數 </summary>
+        /// <summary> Build the argument string passed to highlight.exe. </summary>
         private string GenerateArguments(string inputFileName, string outputFileName)
         {
             StringBuilder sb = new StringBuilder();
@@ -266,7 +266,7 @@ namespace GenerateHighlightContent
             return arguments;
         }
 
-        /// <summary> 讀取 ConfigurationElementCollection </summary>
+        /// <summary> Read a ConfigurationElementCollection into the argument buffer. </summary>
         private void ReadConfigCollection(StringBuilder sb, ConfigurationElementCollection collection)
         {
             foreach (Argument item in collection)

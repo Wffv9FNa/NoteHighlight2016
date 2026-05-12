@@ -18,25 +18,19 @@ namespace NoteHighlightAddin
         #region -- Field and Property --
         private const string span = "</span>";
 
-        //檔案類型
         private string _codeType;
 
-        //檔案名稱
         private string _fileName;
 
         private HighLightParameter _parameters;
         private bool _darkMode;
 
-        //要HighLight的Code
         private string CodeContent { get { return this.txtCode.Text; } }
 
-        //HighLight的樣式
         private string CodeStyle { get { return this.cbx_style.Text; } }
 
-        //是否要行號
         private bool IsShowLineNumber { get { return this.cbx_lineNumber.Checked; } }
 
-        //是否存到剪貼簿
         private bool IsClipboard { get { return this.cbx_Clipboard.Checked; } }
 
         private Color BackgroundColor { get { return this.btnBackground.BackColor; } }
@@ -189,7 +183,6 @@ namespace NoteHighlightAddin
             {
                 using (StreamReader sr = new StreamReader(fs, new UTF8Encoding(false)))
                 {
-                    //Fix 存到剪貼簿空白不見的問題
                     while (sr.Peek() >= 0)
                     {
                         string line = sr.ReadLine();

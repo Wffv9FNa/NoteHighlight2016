@@ -14,12 +14,10 @@ namespace Helper
                 var prop = type.GetProperty(name);
                 if (prop != null)
                 {
-                    // 找到屬性，傳回屬性值執行字串替換
                     return prop.GetValue(data, null).ToString();
                 }
                 else
                 {
-                    // 在物件中找不到符合名稱的屬性，回傳原值不處理
                     return m.Value;
                 }
             });

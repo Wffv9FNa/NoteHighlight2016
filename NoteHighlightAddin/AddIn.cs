@@ -514,8 +514,7 @@ namespace NoteHighlightAddin
 		}
 
         /// <summary>
-        /// 插入 HighLight Code 至滑鼠游標的位置
-        /// Insert HighLight Code To Mouse Position  
+        /// Insert HighLight Code To Mouse Position.
         /// </summary>
         private void InsertHighLightCodeToCurrentSide(string fileName, XElement pageRoot, HighLightParameter parameters, XElement outline, bool selectedTextFormated)
         {
@@ -579,8 +578,7 @@ namespace NoteHighlightAddin
         }
 
         /// <summary>
-        /// 取得滑鼠所在的點
-        /// Get Mouse Point
+        /// Get Mouse Point.
         /// </summary>
         private string[] GetMousePointPosition(XElement pageRoot)
         {
@@ -700,8 +698,7 @@ namespace NoteHighlightAddin
         }
 
         /// <summary>
-        /// 產生 XML 插入至 OneNote
-        /// Generate XML Insert To OneNote
+        /// Generate XML Insert To OneNote.
         /// </summary>
         public XDocument InsertHighLightCode(string htmlContent, string[] position, HighLightParameter parameters, XElement outline, HighLightSection config, bool selectedTextFormated, bool isInline)
         {

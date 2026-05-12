@@ -4,26 +4,26 @@ namespace GenerateHighlightContent
 {
     public interface IGenerateHighLight
     {
-        /// <summary> 產生HighLight Code </summary>
-        /// <returns> 產出的檔案路徑 </returns>
+        /// <summary> Produce highlighted code. </summary>
+        /// <returns> Path of the generated output file. </returns>
         string GenerateHighLightCode(HighLightParameter parameter);
     }
 
     public class HighLightParameter
     {
-        /// <summary> 內容 </summary>
+        /// <summary> Content. </summary>
         public string Content { get; set; }
 
-        /// <summary> 語法類型 </summary>
+        /// <summary> Syntax/language. </summary>
         public string CodeType { get; set; }
 
-        /// <summary> 高亮樣式 </summary>
+        /// <summary> Highlight theme. </summary>
         public string HighLightStyle { get; set; }
 
-        /// <summary> 是否顯示行號 </summary>
+        /// <summary> Whether to show line numbers. </summary>
         public bool ShowLineNumber { get; set; }
 
-        /// <summary> 檔案名稱 </summary>
+        /// <summary> File name. </summary>
         public string FileName { get; set; }
 
         public Color HighlightColor { get; set; }
