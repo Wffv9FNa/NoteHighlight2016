@@ -60,6 +60,8 @@
       <DesignTime>True</DesignTime>
       <DependentUpon>Resource1.resx</DependentUpon>
     </Compile>
+    <Compile Include="LanguageRegistryTests.cs" />
+    <Compile Include="LanguageSettingsTests.cs" />
     <Compile Include="UnitTesting.cs" />
     <Compile Include="PreviewHtmlWrapperTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

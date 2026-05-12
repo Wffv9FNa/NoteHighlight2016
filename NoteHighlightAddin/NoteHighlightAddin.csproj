@@ -93,6 +93,7 @@
     <Reference Include="System.ServiceModel" />
     <Reference Include="System.Speech" />
     <Reference Include="System.Web" />
+    <Reference Include="System.Web.Extensions" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xaml" />
     <Reference Include="System.Xml.Linq" />
@@ -105,6 +106,8 @@
     <Compile Include="CCOMStreamWrapper.cs" />
     <Compile Include="AddIn.cs" />
     <Compile Include="HtmlFragment.cs" />
+    <Compile Include="LanguageRegistry.cs" />
+    <Compile Include="LanguageSettings.cs" />
     <Compile Include="OneNoteMessageFilter.cs" />
     <Compile Include="SettingsHelper.cs" />
     <Compile Include="StaWorker.cs" />

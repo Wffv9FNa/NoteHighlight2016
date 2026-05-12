@@ -35,3 +35,7 @@ using System.Runtime.InteropServices;
 // by using the '*' as shown below:
 [assembly: AssemblyVersion("3.7.*")]
 [assembly: AssemblyFileVersion("3.7.*")]
+
+// Phase 1 language-picker tests reach into LanguageRegistry.ResetForTests().
+// The hook is internal so production code cannot accidentally double-initialise.
+[assembly: InternalsVisibleTo("UnitTesting")]

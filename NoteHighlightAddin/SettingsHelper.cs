@@ -1,3 +1,5 @@
+using System;
+
 namespace NoteHighlightAddin
 {
     /// <summary>
@@ -23,6 +25,33 @@ namespace NoteHighlightAddin
                 // funnel writes through that same instance so the process-wide lock actually
                 // serialises real saves rather than a parallel-but-unused settings object.
                 NoteHighlightForm.Properties.Settings.Default.Save();
+            }
+        }
+
+        /// <summary>
+        /// Persist <paramref name="settings"/> to <paramref name="path"/>. The save itself is
+        /// already serialised by <see cref="LanguageSettings.SaveAtomically"/> via a named mutex
+        /// (cross-process) plus <see cref="SaveLock"/> (in-process); this wrapper exists so
+        /// callers can opt into the same serialisation contract used by <see cref="SafeSave"/>.
+        /// </summary>
+        public static void SaveLanguages(LanguageSettings settings, string path)
+        {
+            if (settings == null) throw new ArgumentNullException(nameof(settings));
+            if (string.IsNullOrEmpty(path)) throw new ArgumentNullException(nameof(path));
+            settings.SaveAtomically(path);
+        }
+
+        /// <summary>
+        /// Canonical location for <c>languages.json</c> on this user account.
+        /// </summary>
+        public static string LanguagesJsonPath
+        {
+            get
+            {
+                return System.IO.Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "NoteHighlight2016",
+                    "languages.json");
             }
         }
     }

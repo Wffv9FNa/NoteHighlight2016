@@ -47,7 +47,11 @@ Tests live in `UnitTesting/UnitTesting.cs` (MSTest, `Microsoft.VisualStudio.Test
 
 ### Adding a new language to the ribbon
 
-Add a `<button>` in `NoteHighlightAddin/ribbon.xml` with `onAction="AddInButtonClicked"`, `tag="<highlight syntax key>"`, and `image="<png in Resources\>"`. End users can also enable the many `visible="false"` buttons already declared by editing `ribbon.xml` in the install folder (no rebuild required - see README).
+Add a `<button>` in `NoteHighlightAddin/ribbon.xml` with `onAction="AddInButtonClicked"`, `tag="<highlight syntax key>"`, `image="<png in Resources\>"`, and `getVisible="GetLanguageButtonVisible"` (the picker controls visibility per-user; do not set `visible="..."` on language buttons). End users opt buttons in or out via the Languages... dialog (Phase 3) rather than by hand-editing `ribbon.xml`.
+
+### `ribbon.xml` is the canonical language list
+
+`NoteHighlightAddin/ribbon.xml` is the single source of truth for which languages the add-in offers. `LanguageRegistry` parses it at startup (via `AddIn.GetAddinDirectory()` + `File.Exists` validation - never `Assembly.Location` directly; see `feedback_com_addin_path_traps.md`) and exposes the parsed `<button>` set as `LanguageRegistry.All`. The per-user picker state (`%APPDATA%\NoteHighlight2016\languages.json`, managed by `LanguageSettings`) only ever **selects from** that set - it cannot introduce a language that ribbon.xml does not declare, and unknown tags persisted in `languages.json` are dropped silently with a `Trace.TraceWarning` on load. Build-time sanity checking against `highlight\langDefs\*.lang` is a separate concern (test-only); a tag with no matching `.lang` file or alias is logged once and not shown to the user. To add a new language, add it to `ribbon.xml` (above) - everything else flows from that.
 
 ### Settings
 

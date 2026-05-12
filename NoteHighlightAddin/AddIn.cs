@@ -72,6 +72,25 @@ namespace NoteHighlightAddin
         // STA, but the sweep itself dispatches to the thread pool.
         private static int _sweepDone;
 
+        // Language-picker state (Phase 1). _ribbon is captured by OnRibbonLoad and
+        // released in OnDisconnection. _languages is the per-user picker state;
+        // reads/writes are coordinated by _languagesLock. _invalidatePending is
+        // set from any thread when settings change; only an onAction observer
+        // ever calls _ribbon.Invalidate() - never a getVisible / getContent
+        // callback (re-entrant Invalidate from inside a get* callback is at best
+        // a no-op and at worst stalls the ribbon for the rest of the session).
+        //
+        // Threading reality (Phase 0 spike, 2026-05-13): OneNote routes ribbon
+        // callbacks through MTA threads, not a single STA. _ribbon is agile from
+        // MTA, so the cached RCW is callable from any ribbon-callback thread.
+        // SynchronizationContext.Current is null on every ribbon-callback thread
+        // observed, so capturing it for .Post(...) would NRE - we use the flag
+        // instead.
+        private Microsoft.Office.Core.IRibbonUI _ribbon;
+        private LanguageSettings _languages;
+        private readonly object _languagesLock = new object();
+        private volatile bool _invalidatePending;
+
         public AddIn()
 		{
 		}
@@ -199,7 +218,55 @@ namespace NoteHighlightAddin
 		/// <param name="custom"></param>
 		public void OnConnection(object Application, ext_ConnectMode ConnectMode, object AddInInst, ref Array custom)
 		{
+			// Plan section 4.2 / reviewer 3.9: ext_cm_UISetup is fired by Office to
+			// let the add-in register its UI; no live application is attached and
+			// per-user state must not be initialised. Bail before SetOneNoteApplication.
+			if (ConnectMode == ext_ConnectMode.ext_cm_UISetup)
+				return;
+
 			SetOneNoteApplication((Application)Application);
+
+			// Language-picker bootstrap (Phase 1). Wrapped in defensive try/catch -
+			// neither call must escape into OnConnection or Office aborts add-in load.
+			try
+			{
+				LanguageRegistry.Initialise(GetAddinDirectory());
+			}
+			catch (Exception ex)
+			{
+				System.Diagnostics.Trace.TraceError("NoteHighlight2016: LanguageRegistry.Initialise threw; continuing with empty registry. " + ex);
+			}
+
+			try
+			{
+				var knownTags = LanguageRegistry.All.Select(d => d.Tag).ToList();
+				var seeded = LanguageSettings.LoadOrSeed(
+					SettingsHelper.LanguagesJsonPath,
+					knownTags,
+					LanguageRegistry.DefaultPinned);
+				lock (_languagesLock)
+				{
+					_languages = seeded;
+				}
+			}
+			catch (Exception ex)
+			{
+				System.Diagnostics.Trace.TraceError("NoteHighlight2016: LanguageSettings.LoadOrSeed threw; ribbon will use fallback defaults. " + ex);
+				// Fall back to an in-memory defaults instance so GetLanguageButtonVisible
+				// still has something to consult.
+				try
+				{
+					var fallback = LanguageSettings.LoadOrSeed(null, null, LanguageRegistry.DefaultPinned);
+					lock (_languagesLock)
+					{
+						_languages = fallback;
+					}
+				}
+				catch
+				{
+					// Never throw out of OnConnection.
+				}
+			}
 
 			// Phase 2.4: best-effort cleanup of stale preview-pane temp dirs left
 			// behind by previous OneNote crashes / kills. Wrap the dispatch (not
@@ -349,6 +416,23 @@ namespace NoteHighlightAddin
 			//    touch the proxy until the moment it exits.
 			OneNoteApplication = null;
 
+			// Release the cached IRibbonUI RCW. Mirrors the OneNoteApplication release above
+			// (plan section 4.2 / reviewer 3.1). Must come after the worker join so a still-
+			// running worker cannot observe a torn-down _ribbon. Best-effort: never throw.
+			if (_ribbon != null)
+			{
+				try
+				{
+					if (Marshal.IsComObject(_ribbon))
+						Marshal.ReleaseComObject(_ribbon);
+				}
+				catch (Exception e)
+				{
+					System.Diagnostics.Trace.TraceWarning("NoteHighlight2016: ReleaseComObject(_ribbon): " + e);
+				}
+				_ribbon = null;
+			}
+
 			// (Suppress unused-variable warning for settingsJoined - it is intentionally captured
 			// for future symmetry / diagnostics even though we have no settings RCW to release.)
 			GC.KeepAlive(settingsJoined);
@@ -362,6 +446,71 @@ namespace NoteHighlightAddin
 		{
 		}
 
+        /// <summary>
+        /// <c>onLoad</c> handler declared on the <c>&lt;customUI&gt;</c> root. Office calls this
+        /// once after parsing the ribbon XML; we cache the <see cref="IRibbonUI"/> RCW so later
+        /// code can request a re-collection of <c>get*</c> values via <see cref="IRibbonUI.Invalidate"/>.
+        ///
+        /// <para>
+        /// Threading (Phase 0 spike): this callback fires on an MTA thread, not an STA. The
+        /// captured RCW is agile-from-MTA so subsequent <c>onAction</c> callbacks - which may
+        /// run on different MTA threads - can use the same reference without RPC errors.
+        /// </para>
+        /// </summary>
+        [System.CLSCompliant(false)]
+        public void OnRibbonLoad(IRibbonUI ribbon)
+        {
+            _ribbon = ribbon;
+        }
+
+        /// <summary>
+        /// <c>getVisible</c> for every language button in the Language group(s) of ribbon.xml.
+        /// Pure dictionary lookup against the cached <see cref="LanguageSettings"/>; deliberately
+        /// does NOT call <c>_ribbon.Invalidate()</c> (re-entrant invalidate from inside a get*
+        /// callback is a documented no-op / stall - see plan section 6 and Phase 0 findings).
+        /// </summary>
+        [System.CLSCompliant(false)]
+        public bool GetLanguageButtonVisible(IRibbonControl control)
+        {
+            if (control == null) return false;
+            LanguageSettings snap;
+            lock (_languagesLock) { snap = _languages; }
+            if (snap == null)
+            {
+                // Pre-OnConnection or load failure - keep the button visible so the user
+                // can still use the add-in if registry init failed for any reason.
+                // (Matches the "fall back to a visible ribbon" intent of section 4.3.)
+                return true;
+            }
+            return snap.IsVisibleAsPinnedButton(control.Tag);
+        }
+
+        /// <summary>
+        /// Common pre-amble for every <c>onAction</c> ribbon callback. If a worker has flipped
+        /// <see cref="_invalidatePending"/> since the last click, this is the only place we call
+        /// <see cref="IRibbonUI.Invalidate"/>. The flag is read-then-cleared without an interlocked
+        /// because Office serialises onAction delivery per ribbon control and the worst case is a
+        /// redundant Invalidate.
+        /// </summary>
+        private void ObservePendingInvalidate()
+        {
+            if (!_invalidatePending) return;
+            _invalidatePending = false;
+            try
+            {
+                _ribbon?.Invalidate();
+            }
+            catch (System.Runtime.InteropServices.COMException ex)
+            {
+                // Host is shutting down or RPC failed - swallow. Settings are already persisted.
+                System.Diagnostics.Trace.TraceWarning("NoteHighlight2016: _ribbon.Invalidate() threw COMException; ignoring. " + ex.Message);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.TraceWarning("NoteHighlight2016: _ribbon.Invalidate() threw; ignoring. " + ex.Message);
+            }
+        }
+
         public bool cbQuickStyle_GetPressed(IRibbonControl control)
         {
             this.QuickStyle = NoteHighlightForm.Properties.Settings.Default.QuickStyle;
@@ -370,6 +519,7 @@ namespace NoteHighlightAddin
 
         public void cbQuickStyle_OnAction(IRibbonControl control, bool isPressed)
         {
+            ObservePendingInvalidate();
             this.QuickStyle = isPressed;
             NoteHighlightForm.Properties.Settings.Default.QuickStyle = this.QuickStyle;
             SettingsHelper.SafeSave();
@@ -384,6 +534,7 @@ namespace NoteHighlightAddin
 
         public void cbDarkMode_OnAction(IRibbonControl control, bool isPressed)
         {
+            ObservePendingInvalidate();
             this.DarkMode = isPressed;
             NoteHighlightForm.Properties.Settings.Default.DarkMode = this.DarkMode;
             SettingsHelper.SafeSave();
@@ -421,11 +572,13 @@ namespace NoteHighlightAddin
 
         public void AddInButtonClicked(IRibbonControl control)
         {
+            ObservePendingInvalidate();
             try
             {
-                // Capture control.Tag (an immutable, apartment-safe managed string) on the main STA
-                // BEFORE crossing apartments. DO NOT capture `control` itself - IRibbonControl is an
-                // RCW belonging to OneNote's main STA and must not cross apartments.
+                // Capture control.Tag (an immutable, apartment-safe managed string) on the
+                // ribbon-callback thread BEFORE crossing apartments. DO NOT capture `control`
+                // itself - IRibbonControl is an RCW owned by Office's ribbon dispatcher and
+                // must not cross apartments.
                 string clickTag = control.Tag;
                 EnsureMainWorker().Post(() => ShowForm(clickTag));
             }
@@ -532,6 +685,7 @@ namespace NoteHighlightAddin
 
         public void SettingsButtonClicked(IRibbonControl control)
         {
+            ObservePendingInvalidate();
             try
             {
                 EnsureSettingsWorker().Post(() => ShowSettingsForm());
