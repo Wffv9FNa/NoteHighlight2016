@@ -2,6 +2,7 @@
 using Helper;
 using ICSharpCode.TextEditor.Document;
 using NoteHighLightForm;
+using NoteHighlightAddin.Preview;
 using System;
 using System.Configuration;
 using System.Drawing;
@@ -191,8 +192,7 @@ namespace NoteHighlightAddin
                         {
 
                             //Remove background-color element so that text would render with correct contrast in dark mode
-                            int bcIndex = line.IndexOf("background-color");
-                            line = line.Remove(bcIndex, line.IndexOf(';', bcIndex) - bcIndex + 1);
+                            line = PreviewHtmlWrapper.StripPreBackgroundColor(line);
                         }
 
 

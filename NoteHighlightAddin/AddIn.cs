@@ -26,6 +26,7 @@ using System.Web;
 using GenerateHighlightContent;
 using System.Configuration;
 using System.Globalization;
+using NoteHighlightAddin.Preview;
 
 #pragma warning disable CS3003 // Type is not CLS-compliant
 
@@ -839,8 +840,7 @@ namespace NoteHighlightAddin
                     if (this.DarkMode)
                     {
                         //Remove background-color element so that text would render with correct contrast in dark mode
-                        int bcIndex = defaultStyle.IndexOf("background-color");
-                        defaultStyle = defaultStyle.Remove(bcIndex, defaultStyle.IndexOf(';', bcIndex) - bcIndex +1);
+                        defaultStyle = PreviewHtmlWrapper.StripPreBackgroundColor(defaultStyle);
                     }
 
                     item = item.Substring(item.IndexOf(">") + 1);
