@@ -7,6 +7,7 @@ using System.IO;
 using System.Diagnostics;
 using System.Reflection;
 using System.Configuration;
+using System.Threading;
 using Helper;
 
 namespace GenerateHighlightContent
@@ -131,6 +132,19 @@ namespace GenerateHighlightContent
         /// <returns>The path to the generated HTML file.</returns>
         public string GenerateHighLightCode(HighLightParameter parameter)
         {
+            return GenerateHighLightCode(parameter, CancellationToken.None);
+        }
+
+        /// <summary>
+        /// Cancellable variant of <see cref="GenerateHighLightCode(HighLightParameter)"/>.
+        /// Threads the supplied <paramref name="cancellationToken"/> into
+        /// <see cref="ProcessHelper.ProcessStart(CancellationToken)"/> so a
+        /// preview render in flight can be terminated when a fresher edit
+        /// arrives. The input scratch file is still deleted on every path via
+        /// the <c>finally</c> block, including the cancellation path.
+        /// </summary>
+        public string GenerateHighLightCode(HighLightParameter parameter, CancellationToken cancellationToken)
+        {
             InitParameter(parameter);
 
             string tempPath = Path.GetTempPath();
@@ -159,7 +173,7 @@ namespace GenerateHighlightContent
                 helper.IsWaitForInputIdle = false;
                 helper.WindowStyle = ProcessWindowStyle.Hidden;
 
-                helper.ProcessStart();
+                helper.ProcessStart(cancellationToken);
 
                 if (!File.Exists(outputFileName))
                     throw new FileNotFoundException("Can not find outputFile.");

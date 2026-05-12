@@ -1,7 +1,6 @@
 using System;
 using System.Text;
 using System.IO;
-using System.Reflection;
 using System.Diagnostics;
 using System.Threading;
 
@@ -36,24 +35,9 @@ namespace Helper
         /// </summary>
         private const int MaxCapturedStderrChars = 4096;
 
-        /// <summary>
-        /// Get Assembly Location.
-        /// </summary>
-        public static string GetAssemblyLocationDirectory
-        {
-            get
-            {
-                string assemblyDirectory = Path.GetDirectoryName(Assembly.GetCallingAssembly().Location);
-                return assemblyDirectory;
-            }
-        }
-
-
         #endregion
 
         #region -- Constructor --
-
-        public ProcessHelper(string fileName):this(GetAssemblyLocationDirectory,fileName){}
 
         public ProcessHelper(string workingDirectory, string fileName)
         {
@@ -62,9 +46,7 @@ namespace Helper
             TimeoutMilliseconds = 30000;
         }
 
-        public ProcessHelper(string fileName, string[] arguments): this(GetAssemblyLocationDirectory, fileName, arguments){}
-
-        public ProcessHelper(string workingDirectory, string fileName,string[] arguments)
+        public ProcessHelper(string workingDirectory, string fileName, string[] arguments)
         {
             WorkingDirectory = workingDirectory;
             FileName = fileName;
@@ -91,6 +73,24 @@ namespace Helper
         ///    <c>highlight.exe</c>.
         /// </summary>
         public void ProcessStart()
+        {
+            ProcessStart(CancellationToken.None);
+        }
+
+        /// <summary>
+        /// Cancellable variant of <see cref="ProcessStart()"/>. While waiting for
+        /// the child process to exit, the supplied <paramref name="cancellationToken"/>
+        /// is polled; on cancellation the child is killed, drained with a brief
+        /// <c>WaitForExit(500)</c>, and an <see cref="OperationCanceledException"/>
+        /// is thrown. The timeout / non-zero-exit-code paths are unchanged.
+        ///
+        /// <para>
+        /// .NET Framework 4.8 does not expose <c>Process.WaitForExitAsync</c>
+        /// (.NET 5+), so the cancellation poll uses repeated short
+        /// <c>WaitForExit(int)</c> slices rather than awaiting the process handle.
+        /// </para>
+        /// </summary>
+        public void ProcessStart(CancellationToken cancellationToken)
         {
             // Resolve FileName against WorkingDirectory when it is not already
             // an absolute path. With UseShellExecute = false (required for stderr
@@ -167,7 +167,41 @@ namespace Helper
                 }
 
                 int timeout = TimeoutMilliseconds <= 0 ? 30000 : TimeoutMilliseconds;
-                bool exited = p.WaitForExit(timeout);
+
+                bool exited;
+                if (cancellationToken.CanBeCanceled)
+                {
+                    // Slice the wait so we observe cancellation requests without
+                    // adding a thread or relying on WaitForExitAsync (.NET 5+).
+                    // 100 ms keeps the cancellation latency well below a user-
+                    // perceptible debounce tick (300 ms) while limiting context-
+                    // switch overhead for typical sub-second highlight.exe runs.
+                    const int sliceMs = 100;
+                    int elapsed = 0;
+                    exited = false;
+                    while (elapsed < timeout)
+                    {
+                        if (cancellationToken.IsCancellationRequested)
+                        {
+                            try { p.Kill(); } catch { /* already gone or access denied */ }
+                            try { p.WaitForExit(500); } catch { }
+                            throw new OperationCanceledException(cancellationToken);
+                        }
+
+                        int slice = Math.Min(sliceMs, timeout - elapsed);
+                        if (p.WaitForExit(slice))
+                        {
+                            exited = true;
+                            break;
+                        }
+                        elapsed += slice;
+                    }
+                }
+                else
+                {
+                    exited = p.WaitForExit(timeout);
+                }
+
                 if (!exited)
                 {
                     try { p.Kill(); } catch { /* already gone or access denied */ }

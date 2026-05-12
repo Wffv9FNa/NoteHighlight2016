@@ -30,6 +30,15 @@ namespace NoteHighlightAddin.Preview
         private HighLightParameter _pendingParameters;
         private bool _pendingDarkMode;
 
+        /// <summary>
+        /// Token source for the currently-scheduled render. Each debounce tick
+        /// cancels the previous CTS (killing any highlight.exe child in flight)
+        /// and creates a new one. Defence in depth alongside <c>_renderSeq</c>:
+        /// the seq-gate discards a stale apply step even when cancellation has
+        /// not yet observed the token.
+        /// </summary>
+        private CancellationTokenSource _renderCts;
+
         public PreviewPane()
         {
             InitializeComponent();
@@ -90,36 +99,52 @@ namespace NoteHighlightAddin.Preview
             string addinDir = AddIn.GetAddinDirectory();
             if (string.IsNullOrEmpty(addinDir)) return;
 
+            // Cancel any render still in flight. The previous CTS is disposed
+            // only by its owning task after observing cancellation, so we just
+            // signal here and replace the field.
+            CancellationTokenSource previousCts = _renderCts;
+            if (previousCts != null)
+            {
+                try { previousCts.Cancel(); } catch (ObjectDisposedException) { }
+            }
+            var myCts = new CancellationTokenSource();
+            _renderCts = myCts;
+            CancellationToken token = myCts.Token;
+
+            // GenerateHighLight builds its input/output paths from
+            // Path.GetTempPath() + parameters.FileName. Compute the FileName
+            // up front so we can best-effort delete the output file from the
+            // cancellation path even though highlight.exe should not have
+            // produced one (File.Delete is idempotent).
+            string paneFileName = "preview-" + Guid.NewGuid().ToString("N");
+            string expectedOutputPath = Path.Combine(Path.GetTempPath(), paneFileName) + ".html";
+
             Task.Run(() =>
             {
                 string wrapped;
+                string scratchPath = null;
                 try
                 {
                     string sessionDir = GetOrCreateSessionTempDir();
                     string scratchName = Path.GetRandomFileName();
-                    string scratchPath = Path.Combine(sessionDir, scratchName);
+                    scratchPath = Path.Combine(sessionDir, scratchName);
 
                     File.WriteAllText(scratchPath, snapshot.Content ?? string.Empty, Encoding.UTF8);
 
-                    // GenerateHighLight builds its own input/output paths from
-                    // Path.GetTempPath() + parameters.FileName, so feed it a
-                    // unique FileName for this render. The pane's own scratch
-                    // file is kept inside _sessionTempDir purely for the
-                    // disposal contract.
                     var paneParameters = new HighLightParameter
                     {
                         Content = snapshot.Content,
                         CodeType = snapshot.CodeType,
                         HighLightStyle = snapshot.HighLightStyle,
                         ShowLineNumber = snapshot.ShowLineNumber,
-                        FileName = "preview-" + Guid.NewGuid().ToString("N"),
+                        FileName = paneFileName,
                         Font = snapshot.Font,
                         FontSize = snapshot.FontSize,
                         HighlightColor = snapshot.HighlightColor
                     };
 
                     var generate = new GenerateHighLight(addinDir);
-                    string outputPath = generate.GenerateHighLightCode(paneParameters);
+                    string outputPath = generate.GenerateHighLightCode(paneParameters, token);
 
                     string rawHtml = File.ReadAllText(outputPath, new UTF8Encoding(false));
                     try { File.Delete(outputPath); } catch { }
@@ -127,11 +152,30 @@ namespace NoteHighlightAddin.Preview
 
                     wrapped = PreviewHtmlWrapper.Wrap(rawHtml, darkMode, BackColor);
                 }
+                catch (OperationCanceledException)
+                {
+                    // Cancellation path: the child was killed mid-run, so the
+                    // output file is unlikely to exist. Still best-effort delete
+                    // both files since File.Delete on a missing path is a no-op
+                    // after the existence check.
+                    try { if (File.Exists(expectedOutputPath)) File.Delete(expectedOutputPath); } catch { }
+                    try { if (scratchPath != null && File.Exists(scratchPath)) File.Delete(scratchPath); } catch { }
+                    return;
+                }
                 catch
                 {
                     // Phase 2.6 will surface errors into the pane. For Phase 1
                     // we silently leave the previous render on screen.
+                    try { if (scratchPath != null && File.Exists(scratchPath)) File.Delete(scratchPath); } catch { }
                     return;
+                }
+                finally
+                {
+                    // The CTS belongs to this render only; dispose once the
+                    // task is done with it. If a newer render has already
+                    // swapped _renderCts, that swap does not invalidate our
+                    // local handle.
+                    try { myCts.Dispose(); } catch { }
                 }
 
                 _uiContext.Post(_ =>
@@ -151,6 +195,16 @@ namespace NoteHighlightAddin.Preview
                 {
                     try { _debounceTimer.Stop(); } catch { }
                     try { _debounceTimer.Dispose(); } catch { }
+                }
+
+                // Cancel any in-flight render so the worker task does not
+                // continue to drive a killed highlight.exe child after we
+                // start tearing down the WebBrowser. The CTS itself is
+                // disposed by the owning task in its finally block.
+                CancellationTokenSource cts = _renderCts;
+                if (cts != null)
+                {
+                    try { cts.Cancel(); } catch (ObjectDisposedException) { }
                 }
 
                 if (browser != null)
