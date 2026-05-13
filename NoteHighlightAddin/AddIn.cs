@@ -55,6 +55,7 @@ namespace NoteHighlightAddin
         // worker's own queue (see OnBeginShutdown).
         private MainForm _currentMainForm;
         private SettingsForm _currentSettingsForm;
+        private LanguageSettingsForm _currentLanguagesForm;
 
         // Filters are held by the AddIn so SignalShutdown() can be invoked from OnBeginShutdown /
         // OnDisconnection on the main STA. The filter's _shuttingDown flag is volatile, so this
@@ -205,6 +206,13 @@ namespace NoteHighlightAddin
 			if (sf != null)
 			{
 				try { sf.BeginInvoke(new Action(() => { try { sf.Close(); } catch { } })); }
+				catch { /* form may already be disposed or its handle not yet created */ }
+			}
+
+			var lf = _currentLanguagesForm;
+			if (lf != null)
+			{
+				try { lf.BeginInvoke(new Action(() => { try { lf.Close(); } catch { } })); }
 				catch { /* form may already be disposed or its handle not yet created */ }
 			}
 			// Return immediately. The actual worker join happens in OnDisconnection.
@@ -855,6 +863,88 @@ namespace NoteHighlightAddin
             {
                 MessageBox.Show("Exception from ShowSettingsForm: " + e.ToString());
             }
+        }
+
+        /// <summary>
+        /// onAction for the "Languages..." ribbon button in the Advanced group. Dispatches to the
+        /// existing settings STA worker (mirrors <see cref="SettingsButtonClicked"/>). The actual
+        /// form (LanguageSettingsForm) is constructed and Run on the worker thread; this method
+        /// must return promptly so OneNote's ribbon dispatcher does not stall.
+        /// </summary>
+        [System.CLSCompliant(false)]
+        public void LanguagesButtonClicked(IRibbonControl control)
+        {
+            ObservePendingInvalidate();
+            try
+            {
+                // Snapshot the current LanguageSettings under the lock and hand the worker a deep
+                // copy so the user can edit independently of the live ribbon state. The save path
+                // calls ReplaceLanguageSettings(...) with the post-edit instance.
+                LanguageSettings snap;
+                lock (_languagesLock) { snap = _languages; }
+
+                // Defensive: if OnConnection's seed somehow failed we still want the dialog to
+                // open, so the user can hit Reset to defaults and recover.
+                var editable = LanguageSettingsForm.CloneForEditing(snap, LanguageRegistry.DefaultPinned);
+                var registry = LanguageRegistry.All;
+                var jsonPath = SettingsHelper.LanguagesJsonPath;
+
+                EnsureSettingsWorker().Post(() => ShowLanguageSettingsForm(editable, registry, jsonPath));
+            }
+            catch (Exception e)
+            {
+                MessageBox.Show("Exception from LanguagesButtonClicked: " + e.ToString());
+            }
+        }
+
+        private void ShowLanguageSettingsForm(LanguageSettings editable,
+                                              IReadOnlyList<LanguageDescriptor> registry,
+                                              string jsonPath)
+        {
+            try
+            {
+                LanguageSettingsForm form;
+                try
+                {
+                    form = new LanguageSettingsForm(this, editable, registry, jsonPath);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Could not open NoteHighlight Languages dialog: " + ex.Message);
+                    return;
+                }
+
+                _currentLanguagesForm = form;
+                try
+                {
+                    System.Windows.Forms.Application.Run(form);
+                }
+                finally
+                {
+                    _currentLanguagesForm = null;
+                }
+            }
+            catch (Exception e)
+            {
+                MessageBox.Show("Exception from ShowLanguageSettingsForm: " + e.ToString());
+            }
+        }
+
+        /// <summary>
+        /// Called by <see cref="LanguageSettingsForm"/> on the settings STA after a successful
+        /// save. Atomically swaps the live <c>_languages</c> reference under <see cref="_languagesLock"/>
+        /// and sets <see cref="_invalidatePending"/> so the next ribbon onAction triggers an
+        /// IRibbonUI.Invalidate(). DOES NOT touch <see cref="_ribbon"/> directly - the worker has
+        /// no apartment-safe handle on Office's ribbon-callback threads.
+        /// </summary>
+        internal void ReplaceLanguageSettings(LanguageSettings settings)
+        {
+            if (settings == null) return;
+            lock (_languagesLock)
+            {
+                _languages = settings;
+            }
+            _invalidatePending = true;
         }
 
         /// <summary>

@@ -33,11 +33,12 @@ In case AddIn doesn't show after install, check if this helps [Not showing after
 4. Edit text or change formatting same as for new code
 
 # Additional languages
-1. Go to installation folder and find file ribbon.xml and open it with text editor <br />
-Default installation folder: C:\Program Files\CodingRoad\NoteHighlight2016\
-2. Edit property "visible" from "false" to "true" for languages that you want to use. It is necessary to restart OneNote for changes to take effect
 
-It is also possible to add new languages (supported by highlight tool) by adding new rows to ribbon.xml but if you need new language then you are smart enough to figure it out :)
+From v3.8 onwards, the set of languages shown on the ribbon is controlled per-user from the **Languages...** button in the NoteHighlight ribbon's Advanced group. Open the dialog to pin languages as large ribbon buttons (up to 14) and enable additional languages under the **More languages...** dropdown. Settings live in `%APPDATA%\NoteHighlight2016\languages.json` and are preserved across uninstall / upgrade. The ribbon refreshes on the next ribbon click after **Apply** or **OK**.
+
+> **Migration note:** If you previously hand-edited `ribbon.xml` to enable extra languages, open **Languages...** and tick them again - that file is now treated as the canonical declaration of available languages and is no longer the place to opt languages in or out.
+
+Adding wholly new languages (supported by the `highlight` tool but not yet declared in `ribbon.xml`) still requires editing `ribbon.xml` in the installation folder and is for advanced users.
 
 # Sample of Themes
 samples directory [Theme Samples](./img/Theme%20Samples/ThemeSample.md)
