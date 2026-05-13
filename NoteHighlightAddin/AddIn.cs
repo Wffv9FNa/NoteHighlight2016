@@ -155,9 +155,15 @@ namespace NoteHighlightAddin
             // on upgrade, so the embedded copy moves with it. See
             // .local/docs/bugs/msi-ribbon-stale-on-upgrade.md (bug 13.1).
             //
-            // Fallback order:
-            //   1. On-disk ribbon.xml next to the DLL, if present. Dev / diagnostic
-            //      hot-edit convenience: edit the file, restart OneNote, no rebuild.
+            // Fallback order (post bug 13.1 followup, 2026-05-13 evening):
+            //   1. On-disk ribbon.override.xml next to the DLL, if present.
+            //      Dev / diagnostic hot-edit convenience: edit the file, restart
+            //      OneNote, no rebuild. End-user MSIs never ship this filename.
+            //   1b. A legacy on-disk ribbon.xml (from a pre-3.9 install whose
+            //       Permanent=TRUE MSI component never uninstalled the file) is
+            //       deliberately IGNORED with a Trace warning. It is almost
+            //       certainly stale; reading it would beat the embedded copy
+            //       and silently regress ribbon changes shipped via DLL upgrade.
             //   2. Embedded Resources.ribbon (the canonical end-user path).
             //   3. Empty string + MessageBox (existing error path).
 
@@ -166,11 +172,20 @@ namespace NoteHighlightAddin
                 var addinDir = GetAddinDirectory();
                 if (!string.IsNullOrEmpty(addinDir))
                 {
-                    var onDisk = Path.Combine(addinDir, "ribbon.xml");
+                    // Legacy-file safety net (1b). Log the resolved path so a user
+                    // who wants a clean install knows where to point a Remove-Item.
+                    var legacy = Path.Combine(addinDir, LanguageRegistry.LegacyOnDiskRibbonFileName);
+                    if (File.Exists(legacy))
+                    {
+                        System.Diagnostics.Trace.TraceWarning("NoteHighlight2016: ignoring legacy on-disk '" + legacy + "' - the embedded ribbon resource is canonical. You may delete this file manually; the add-in no longer reads it.");
+                    }
+
+                    var onDisk = Path.Combine(addinDir, LanguageRegistry.OnDiskRibbonFileName);
                     // File.Exists guard mirrors the rule in feedback_com_addin_path_traps.md -
                     // never assume a sibling file is present under COM activation.
                     if (File.Exists(onDisk))
                     {
+                        System.Diagnostics.Trace.TraceInformation("NoteHighlight2016: using on-disk ribbon override '" + onDisk + "'.");
                         return File.ReadAllText(onDisk);
                     }
                 }
@@ -178,7 +193,7 @@ namespace NoteHighlightAddin
             catch (Exception e)
             {
                 // Hot-edit fallback failure is non-fatal; fall through to the embedded copy.
-                System.Diagnostics.Trace.TraceWarning("NoteHighlight2016: on-disk ribbon.xml read failed; falling back to embedded resource. " + e.Message);
+                System.Diagnostics.Trace.TraceWarning("NoteHighlight2016: on-disk ribbon override read failed; falling back to embedded resource. " + e.Message);
             }
 
             try

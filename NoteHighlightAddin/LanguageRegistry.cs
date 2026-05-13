@@ -110,12 +110,34 @@ namespace NoteHighlightAddin
         }
 
         /// <summary>
-        /// Parse the embedded ribbon.xml resource, preferring an on-disk copy
-        /// next to the DLL if present (dev / diagnostic hot-edit). Never throws.
-        /// Equivalent to <see cref="Initialise(string)"/> with the addin directory
-        /// resolved from <see cref="AddIn.GetAddinDirectory"/>. See bug 13.1
-        /// (.local/docs/bugs/msi-ribbon-stale-on-upgrade.md) for why the canonical
-        /// source is now the embedded copy rather than the on-disk file.
+        /// The on-disk filename used by the dev / diagnostic hot-edit fallback.
+        /// Renamed from <c>ribbon.xml</c> to <c>ribbon.override.xml</c> as part
+        /// of bug 13.1 followup (2026-05-13 evening): end-user installs must
+        /// never have this file present, so we picked a name the MSI does not
+        /// ship. See <see cref="LegacyOnDiskRibbonFileName"/> for the legacy
+        /// safety-net path.
+        /// </summary>
+        public const string OnDiskRibbonFileName = "ribbon.override.xml";
+
+        /// <summary>
+        /// Legacy hot-edit filename. Older installs (&lt;= 3.8) wrote
+        /// <c>ribbon.xml</c> to the addin directory via the MSI content list,
+        /// and the component was marked <c>Permanent=TRUE</c> so uninstall did
+        /// not remove it. If such a file is found next to the DLL we IGNORE it
+        /// (Trace warning) and use the embedded copy. The file is now harmless
+        /// dead data; users may delete it manually but the add-in will work
+        /// correctly either way.
+        /// </summary>
+        internal const string LegacyOnDiskRibbonFileName = "ribbon.xml";
+
+        /// <summary>
+        /// Parse the embedded ribbon.xml resource, preferring an on-disk
+        /// <c>ribbon.override.xml</c> next to the DLL if present (dev /
+        /// diagnostic hot-edit). Never throws. Equivalent to
+        /// <see cref="Initialise(string)"/> with the addin directory resolved
+        /// from <see cref="AddIn.GetAddinDirectory"/>. See bug 13.1
+        /// (.local/docs/bugs/msi-ribbon-stale-on-upgrade.md) for why the
+        /// canonical source is the embedded copy rather than an on-disk file.
         /// </summary>
         public static void Initialise()
         {
@@ -128,19 +150,23 @@ namespace NoteHighlightAddin
         /// warning is emitted.
         ///
         /// <para>
-        /// Source order (post bug 13.1 fix): if <paramref name="addinDirectory"/>
-        /// contains a ribbon.xml file on disk, parse that (dev / diagnostic
-        /// hot-edit convenience). Otherwise fall back to the embedded
-        /// <c>Properties.Resources.ribbon</c> copy, which is the canonical end-user
-        /// path because the DLL is versioned and always replaces on MSI upgrade -
-        /// unlike the unversioned on-disk ribbon.xml, which Windows Installer can
-        /// legitimately skip on upgrade.
+        /// Source order (post bug 13.1 followup): if
+        /// <paramref name="addinDirectory"/> contains a
+        /// <c>ribbon.override.xml</c> file on disk, parse that (dev /
+        /// diagnostic hot-edit convenience). Otherwise fall back to the
+        /// embedded <c>Properties.Resources.ribbon</c> copy. A legacy
+        /// <c>ribbon.xml</c> next to the DLL is deliberately IGNORED (with a
+        /// Trace warning logging the resolved path) - older MSIs marked the
+        /// component <c>Permanent=TRUE</c>, so the file persists across
+        /// uninstall and would otherwise beat the embedded copy with stale
+        /// content.
         /// </para>
         ///
         /// <para>
         /// The path overload remains for unit-test fixtures that write a
-        /// ribbon.xml to a temp directory and want it picked up deterministically;
-        /// production callers should prefer <see cref="Initialise()"/>.
+        /// ribbon.override.xml to a temp directory and want it picked up
+        /// deterministically; production callers should prefer
+        /// <see cref="Initialise()"/>.
         /// </para>
         /// </summary>
         public static void Initialise(string addinDirectory)
@@ -149,29 +175,44 @@ namespace NoteHighlightAddin
             if (Interlocked.CompareExchange(ref _initialised, 1, 0) != 0)
                 return;
 
-            string ribbonPath = null;
+            string overridePath = null;
             try
             {
                 XDocument doc = null;
                 string sourceDescription = null;
 
-                // 1. Hot-edit / diagnostic path: a ribbon.xml file next to the DLL.
-                //    Memory rule "feedback_com_addin_path_traps.md": validate
-                //    File.Exists and fail soft so we can fall through to the
-                //    embedded copy rather than dying under COM activation drift.
                 if (!string.IsNullOrEmpty(addinDirectory))
                 {
-                    ribbonPath = Path.Combine(addinDirectory, "ribbon.xml");
-                    if (File.Exists(ribbonPath))
+                    // 1a. Legacy-file safety net. If an old ribbon.xml is
+                    //     sitting next to the DLL (left behind by a pre-3.9
+                    //     install whose Permanent=TRUE component was never
+                    //     uninstalled, or a hand-edit by a power user), log
+                    //     and ignore it - the embedded copy is canonical and
+                    //     the legacy file is almost certainly stale. Memory
+                    //     rule "feedback_com_addin_path_traps.md": validate
+                    //     File.Exists and log the resolved path.
+                    var legacyPath = Path.Combine(addinDirectory, LegacyOnDiskRibbonFileName);
+                    if (File.Exists(legacyPath))
+                    {
+                        Trace.TraceWarning("NoteHighlight2016: ignoring legacy on-disk '" + legacyPath + "' - the embedded ribbon resource is canonical. You may delete this file manually; the add-in no longer reads it.");
+                    }
+
+                    // 1b. Hot-edit / diagnostic path: a ribbon.override.xml
+                    //     file next to the DLL. End-user installs never ship
+                    //     this file - it only exists if a developer placed it
+                    //     there intentionally.
+                    overridePath = Path.Combine(addinDirectory, OnDiskRibbonFileName);
+                    if (File.Exists(overridePath))
                     {
                         try
                         {
-                            doc = XDocument.Load(ribbonPath);
-                            sourceDescription = ribbonPath;
+                            doc = XDocument.Load(overridePath);
+                            sourceDescription = overridePath;
+                            Trace.TraceInformation("NoteHighlight2016: using on-disk ribbon override '" + overridePath + "'.");
                         }
                         catch (Exception ex)
                         {
-                            Trace.TraceWarning("NoteHighlight2016: failed to parse on-disk '" + ribbonPath + "'; falling back to embedded resource. " + ex.GetType().Name + ": " + ex.Message);
+                            Trace.TraceWarning("NoteHighlight2016: failed to parse on-disk '" + overridePath + "'; falling back to embedded resource. " + ex.GetType().Name + ": " + ex.Message);
                             doc = null;
                         }
                     }
@@ -193,7 +234,7 @@ namespace NoteHighlightAddin
 
                     if (string.IsNullOrEmpty(embedded))
                     {
-                        Trace.TraceError("NoteHighlight2016: embedded ribbon resource is empty and no on-disk ribbon.xml found (looked at '" + (ribbonPath ?? "<no addin directory>") + "'); LanguageRegistry left empty.");
+                        Trace.TraceError("NoteHighlight2016: embedded ribbon resource is empty and no on-disk ribbon.override.xml found (looked at '" + (overridePath ?? "<no addin directory>") + "'); LanguageRegistry left empty.");
                         return;
                     }
 
@@ -259,7 +300,7 @@ namespace NoteHighlightAddin
                 // Defensive: never let an unanticipated exception escape into
                 // OnConnection. Log with the resolved path so the user can see
                 // where we looked.
-                Trace.TraceError("NoteHighlight2016: unexpected error initialising LanguageRegistry from '" + (ribbonPath ?? addinDirectory ?? "<null>") + "'; " + ex);
+                Trace.TraceError("NoteHighlight2016: unexpected error initialising LanguageRegistry from '" + (overridePath ?? addinDirectory ?? "<null>") + "'; " + ex);
             }
         }
 
