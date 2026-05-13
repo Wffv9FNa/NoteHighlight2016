@@ -159,6 +159,57 @@ namespace UnitTesting
         }
 
         [TestMethod]
+        public void Initialise_NewLanguages_AreAllRegistered()
+        {
+            // Plan section 5.1: locks the contract that all six newly-added
+            // ribbon buttons resolve through LanguageRegistry. A failure here
+            // means ribbon.xml was edited without updating the registry parser,
+            // or the new <button> rows are missing required attributes.
+            LanguageRegistry.Initialise(AddinSourceDir);
+
+            var expected = new[] { "yaml", "rust", "kotlin", "dockerfile", "tex", "autohotkey" };
+            foreach (var tag in expected)
+            {
+                var d = LanguageRegistry.ByTag(tag);
+                Assert.IsNotNull(d, "ribbon.xml must declare a button with tag='" + tag + "'.");
+                Assert.IsFalse(string.IsNullOrEmpty(d.Label), "tag '" + tag + "' must have a label.");
+                Assert.IsFalse(string.IsNullOrEmpty(d.Image), "tag '" + tag + "' must have an image.");
+            }
+        }
+
+        [TestMethod]
+        public void NewLanguages_HaveMatchingLangDefFiles()
+        {
+            // Plan section 5.2: build-time sanity check. Each new ribbon tag
+            // must correspond to a *.lang file shipped under highlight\langDefs,
+            // otherwise highlight.exe will reject --syntax=<tag> at runtime.
+            var langDefsDir = Path.Combine(RepoRoot, "NoteHighlightAddin", "highlight", "langDefs");
+            Assert.IsTrue(Directory.Exists(langDefsDir), "langDefs directory must exist.");
+
+            var expected = new[] { "yaml", "rust", "kotlin", "dockerfile", "tex", "autohotkey" };
+            foreach (var tag in expected)
+            {
+                var langFile = Path.Combine(langDefsDir, tag + ".lang");
+                Assert.IsTrue(File.Exists(langFile), "Missing langDef file: " + langFile);
+            }
+        }
+
+        [TestMethod]
+        public void RegistryTags_AreAllUnique()
+        {
+            // Plan section 5.3: cheap insurance against a copy-paste typo
+            // introducing a duplicate tag="..." in ribbon.xml. LanguageRegistry
+            // groups its internal lookup by id, which would silently swallow a
+            // second button with the same tag - this assertion catches it.
+            LanguageRegistry.Initialise(AddinSourceDir);
+
+            var tags = LanguageRegistry.All.Select(d => d.Tag).ToList();
+            var distinct = tags.Distinct(StringComparer.Ordinal).Count();
+            Assert.AreEqual(tags.Count, distinct,
+                "Duplicate tag in ribbon.xml. Tags: " + string.Join(", ", tags));
+        }
+
+        [TestMethod]
         public void Initialise_NoArgOverload_UsesEmbeddedOrOnDisk()
         {
             // The no-arg overload resolves the addin directory via
