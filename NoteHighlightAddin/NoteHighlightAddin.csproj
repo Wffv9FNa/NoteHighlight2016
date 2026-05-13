@@ -182,9 +182,20 @@
     <Content Include="Resources\XHTML.png" />
     <Content Include="Resources\XML.png" />
     <None Include="packages.config" />
+    <!--
+      ribbon.xml is intentionally NOT copied to the build output (and
+      therefore NOT included in the MSI content list). It ships embedded
+      in the assembly via Properties\Resources.resx (ResXFileRef), which
+      is the canonical end-user path. Dropping the on-disk copy closes
+      bug 13.1 followup (2026-05-13 evening): see
+      .local/docs/bugs/msi-ribbon-stale-on-upgrade.md for the full story.
+      Devs who want a hot-edit copy must explicitly drop a sibling
+      ribbon.override.xml next to the DLL - the on-disk lookup in
+      LanguageRegistry.Initialise / AddIn.LoadRibbon now uses that name.
+    -->
     <None Include="ribbon.xml">
       <SubType>Designer</SubType>
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </None>
   </ItemGroup>
   <ItemGroup>
