@@ -516,6 +516,39 @@ namespace UnitTesting
         }
 
         [TestMethod]
+        public void GetMoreLanguagesMenu_IncludesEnabledNotPinnedNewLanguage()
+        {
+            // Plan section 5.4: round-trip one of the six newly-added languages
+            // through the registry + dynamic-menu builder. The user enables YAML
+            // via the Languages... dialog but does not pin it; the dynamic menu
+            // must therefore include a dyn_yaml button carrying tag="yaml".
+            var registry = new[]
+            {
+                Desc("cs", "C#"),
+                Desc("yaml", "YAML"),
+            };
+            var settings = BuildSettings(pinned: new string[0], enabled: new[] { "yaml" });
+
+            Assert.IsTrue(settings.IsEnabled("yaml"));
+            Assert.IsFalse(settings.IsPinned("yaml"));
+            Assert.IsTrue(settings.IsVisibleInMoreMenu("yaml"));
+
+            string xml = AddIn.BuildMoreLanguagesMenuXml(settings, registry);
+            var doc = XDocument.Parse(xml);
+            XNamespace ns = AddIn.CustomUiNamespace;
+
+            Assert.AreEqual("menu", doc.Root.Name.LocalName);
+            Assert.AreEqual(AddIn.CustomUiNamespace, doc.Root.Name.NamespaceName);
+
+            var yamlBtn = doc.Root.Elements(ns + "button")
+                                  .FirstOrDefault(e => (string)e.Attribute("tag") == "yaml");
+            Assert.IsNotNull(yamlBtn, "Dynamic menu must include the enabled-not-pinned 'yaml' tag.");
+            Assert.AreEqual("dyn_yaml", (string)yamlBtn.Attribute("id"));
+            Assert.AreEqual("YAML", (string)yamlBtn.Attribute("label"));
+            Assert.AreEqual("AddInButtonClicked", (string)yamlBtn.Attribute("onAction"));
+        }
+
+        [TestMethod]
         public void GetMoreLanguagesMenu_LabelWithSpecialCharsIsEscaped()
         {
             // XmlWriter must escape & < > " in attribute values - this is the whole reason
