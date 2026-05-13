@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NoteHighlightAddin;
 using GenerateHighlightContent;
@@ -343,6 +344,192 @@ namespace UnitTesting
             XDocument output = addIn.InsertHighLightCode(htmlCode, pos, param, outline, config, selectedTextFormated, addIn.IsSelectedTextInline(page4Root));
 
             Assert.AreEqual(Resource1.Output4, output.ToString(), false);
+        }
+    }
+
+    /// <summary>
+    /// Tests covering the dynamic-menu payload produced by
+    /// <c>AddIn.BuildMoreLanguagesMenuXml</c>. Phase 2 of the language picker plan
+    /// (plan section 9.1 "RibbonInvalidationTests"): verify that the returned
+    /// fragment is well-formed and declares the customUI namespace on its root
+    /// &lt;menu&gt; element, that pinned entries are excluded, and that items are
+    /// sorted by display label.
+    /// </summary>
+    [TestClass]
+    public class RibbonInvalidationTests
+    {
+        private static LanguageDescriptor Desc(string tag, string label, string image = "Other.png", string screentip = null)
+        {
+            return new LanguageDescriptor("button_" + tag, tag, label, screentip, image, null);
+        }
+
+        private static LanguageSettings BuildSettings(IReadOnlyList<string> pinned, IReadOnlyList<string> enabled)
+        {
+            // Drive the public API to construct an instance with the desired contents.
+            // LoadOrSeed has private ctors but it accepts a defaultPinned argument, so we
+            // seed via a missing path then mutate to add any extra enabled tags.
+            var seed = LanguageSettings.LoadOrSeed(
+                path: null,
+                knownTags: null,
+                defaultPinned: pinned);
+            foreach (var tag in enabled)
+            {
+                seed.Enable(tag);
+            }
+            return seed;
+        }
+
+        [TestMethod]
+        public void GetMoreLanguagesMenu_RootDeclaresCustomUiNamespace()
+        {
+            var registry = new[]
+            {
+                Desc("cs", "C#"),
+                Desc("go", "Go"),
+            };
+            var settings = BuildSettings(pinned: new[] { "cs" }, enabled: new[] { "cs", "go" });
+
+            string xml = AddIn.BuildMoreLanguagesMenuXml(settings, registry);
+
+            // Parse and assert the root carries the expected xmlns.
+            var doc = XDocument.Parse(xml);
+            Assert.AreEqual("menu", doc.Root.Name.LocalName);
+            Assert.AreEqual(AddIn.CustomUiNamespace, doc.Root.Name.NamespaceName,
+                "Dynamic-menu root must declare the customUI xmlns or Office silently drops the menu.");
+        }
+
+        [TestMethod]
+        public void GetMoreLanguagesMenu_OmitsPinnedAndDisabledLanguages()
+        {
+            var registry = new[]
+            {
+                Desc("cs", "C#"),
+                Desc("go", "Go"),
+                Desc("ts", "TypeScript"),
+                Desc("rs", "Rust"),
+            };
+            // pinned: cs ; enabled (full set incl. pinned): cs, go, ts ; rs is disabled.
+            var settings = BuildSettings(pinned: new[] { "cs" }, enabled: new[] { "cs", "go", "ts" });
+
+            string xml = AddIn.BuildMoreLanguagesMenuXml(settings, registry);
+            var doc = XDocument.Parse(xml);
+            XNamespace ns = AddIn.CustomUiNamespace;
+
+            var tags = doc.Root.Elements(ns + "button")
+                                .Select(b => (string)b.Attribute("tag"))
+                                .ToList();
+
+            CollectionAssert.AreEquivalent(new[] { "go", "ts" }, tags,
+                "Dynamic menu must list enabled-but-not-pinned tags only.");
+            Assert.IsFalse(tags.Contains("cs"), "Pinned tags must not appear in the dynamic menu.");
+            Assert.IsFalse(tags.Contains("rs"), "Disabled tags must not appear in the dynamic menu.");
+        }
+
+        [TestMethod]
+        public void GetMoreLanguagesMenu_ItemsAreSortedByLabel()
+        {
+            var registry = new[]
+            {
+                Desc("ts", "TypeScript"),
+                Desc("go", "Go"),
+                Desc("rs", "Rust"),
+                Desc("py", "Python"),
+            };
+            var settings = BuildSettings(pinned: new string[0], enabled: new[] { "ts", "go", "rs", "py" });
+
+            string xml = AddIn.BuildMoreLanguagesMenuXml(settings, registry);
+            var doc = XDocument.Parse(xml);
+            XNamespace ns = AddIn.CustomUiNamespace;
+
+            var labels = doc.Root.Elements(ns + "button")
+                                 .Select(b => (string)b.Attribute("label"))
+                                 .ToList();
+
+            CollectionAssert.AreEqual(new[] { "Go", "Python", "Rust", "TypeScript" }, labels,
+                "Dynamic-menu items must be sorted by display label.");
+        }
+
+        [TestMethod]
+        public void GetMoreLanguagesMenu_EachItemReusesAddInButtonClicked()
+        {
+            var registry = new[] { Desc("go", "Go"), Desc("ts", "TypeScript") };
+            var settings = BuildSettings(pinned: new string[0], enabled: new[] { "go", "ts" });
+
+            string xml = AddIn.BuildMoreLanguagesMenuXml(settings, registry);
+            var doc = XDocument.Parse(xml);
+            XNamespace ns = AddIn.CustomUiNamespace;
+
+            foreach (var btn in doc.Root.Elements(ns + "button"))
+            {
+                Assert.AreEqual("AddInButtonClicked", (string)btn.Attribute("onAction"),
+                    "Dynamic-menu buttons must reuse the existing onAction so the highlight path is shared.");
+                Assert.IsTrue(((string)btn.Attribute("id")).StartsWith("dyn_", StringComparison.Ordinal),
+                    "Dynamic-menu button ids must be namespaced ('dyn_<tag>') so they cannot collide with pinned button ids.");
+                Assert.IsFalse(string.IsNullOrEmpty((string)btn.Attribute("image")),
+                    "Every dynamic-menu button must carry an image attribute.");
+            }
+        }
+
+        [TestMethod]
+        public void GetMoreLanguagesMenu_EmptyWhenNothingEnabledButPinned()
+        {
+            var registry = new[] { Desc("cs", "C#") };
+            var settings = BuildSettings(pinned: new[] { "cs" }, enabled: new[] { "cs" });
+
+            string xml = AddIn.BuildMoreLanguagesMenuXml(settings, registry);
+            var doc = XDocument.Parse(xml);
+            XNamespace ns = AddIn.CustomUiNamespace;
+
+            Assert.AreEqual("menu", doc.Root.Name.LocalName);
+            Assert.AreEqual(AddIn.CustomUiNamespace, doc.Root.Name.NamespaceName);
+            Assert.AreEqual(0, doc.Root.Elements(ns + "button").Count(),
+                "Menu must be empty when every enabled tag is also pinned.");
+        }
+
+        [TestMethod]
+        public void GetMoreLanguagesMenu_NullSettingsYieldsWellFormedEmptyMenu()
+        {
+            var registry = new[] { Desc("cs", "C#") };
+
+            string xml = AddIn.BuildMoreLanguagesMenuXml(settings: null, registry: registry);
+            var doc = XDocument.Parse(xml);
+
+            Assert.AreEqual("menu", doc.Root.Name.LocalName);
+            Assert.AreEqual(AddIn.CustomUiNamespace, doc.Root.Name.NamespaceName);
+            Assert.IsFalse(doc.Root.HasElements);
+        }
+
+        [TestMethod]
+        public void GetMoreLanguagesMenu_TagOutsideRegistryIsDropped()
+        {
+            // A tag persisted in languages.json that no longer appears in ribbon.xml
+            // must not be rendered (we have no descriptor to draw the button from).
+            var registry = new[] { Desc("cs", "C#") };
+            var settings = BuildSettings(pinned: new string[0], enabled: new[] { "ghost-tag" });
+
+            string xml = AddIn.BuildMoreLanguagesMenuXml(settings, registry);
+            var doc = XDocument.Parse(xml);
+            XNamespace ns = AddIn.CustomUiNamespace;
+
+            Assert.AreEqual(0, doc.Root.Elements(ns + "button").Count(),
+                "Tags without a matching descriptor must be silently dropped from the dynamic menu.");
+        }
+
+        [TestMethod]
+        public void GetMoreLanguagesMenu_LabelWithSpecialCharsIsEscaped()
+        {
+            // XmlWriter must escape & < > " in attribute values - this is the whole reason
+            // the dynamic-menu fragment is built via XmlWriter rather than string concatenation.
+            var registry = new[] { Desc("ab", "A & B <c>") };
+            var settings = BuildSettings(pinned: new string[0], enabled: new[] { "ab" });
+
+            string xml = AddIn.BuildMoreLanguagesMenuXml(settings, registry);
+            var doc = XDocument.Parse(xml);  // would throw if escaping were wrong
+            XNamespace ns = AddIn.CustomUiNamespace;
+
+            var btn = doc.Root.Element(ns + "button");
+            Assert.IsNotNull(btn);
+            Assert.AreEqual("A & B <c>", (string)btn.Attribute("label"));
         }
     }
 }

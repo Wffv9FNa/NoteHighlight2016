@@ -39,6 +39,14 @@
                   <button id="buttonSwift" label="Swift" size="large" screentip="Enter Swift Code" onAction="AddInButtonClicked" tag="swift"  image="Other.png" getVisible="GetLanguageButtonVisible"/>
                   <button id="buttonVisualBasic" label="Visual Basic" size="large" screentip="Enter Visual Basic Code" onAction="AddInButtonClicked" tag="vb"  image="Other.png" getVisible="GetLanguageButtonVisible"/>
 				  <button id="buttonTypeScript" label="TypeScript" size="large" screentip="Enter Type Script Code" onAction="AddInButtonClicked" tag="ts"  image="Other.png" getVisible="GetLanguageButtonVisible"/>
+                  <dynamicMenu id="menuMoreLanguages"
+                               label="More languages..."
+                               size="large"
+                               keytip="M"
+                               image="Other.png"
+                               screentip="More languages enabled via Languages... but not pinned to the ribbon"
+                               getContent="GetMoreLanguagesMenu"
+                               getVisible="GetMoreMenuVisible"/>
 				</group>
         <group label="Advanced" id="Advanced">
                 <checkBox id="cbQuickStyle"  label="Quick Style" onAction="cbQuickStyle_OnAction" getPressed="cbQuickStyle_GetPressed"/>

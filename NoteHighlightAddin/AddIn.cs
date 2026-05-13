@@ -3,12 +3,14 @@
  */
 
 using System;
+using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.ComTypes;
 using System.Windows.Forms;
+using System.Xml;
 using System.Xml.Linq;
 using Extensibility;
 using Microsoft.Office.Core;
@@ -483,6 +485,134 @@ namespace NoteHighlightAddin
                 return true;
             }
             return snap.IsVisibleAsPinnedButton(control.Tag);
+        }
+
+        /// <summary>
+        /// <c>getVisible</c> for the <c>menuMoreLanguages</c> dynamic menu. The menu hides
+        /// when nothing is "enabled but not pinned" so the ribbon does not show an empty
+        /// dropdown. Like <see cref="GetLanguageButtonVisible"/>, this callback is a pure
+        /// snapshot read and must NOT call <c>_ribbon.Invalidate()</c> - Office is mid-
+        /// collection of get* values and the call is re-entrant.
+        /// </summary>
+        [System.CLSCompliant(false)]
+        public bool GetMoreMenuVisible(IRibbonControl control)
+        {
+            LanguageSettings snap;
+            lock (_languagesLock) { snap = _languages; }
+            if (snap == null) return false;
+
+            // Cheap walk - Enabled is typically small (< 40 items) and we exit on the
+            // first hit. Materialising a difference set per call would cost more.
+            foreach (var tag in snap.Enabled)
+            {
+                if (!snap.IsPinned(tag)) return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// <c>getContent</c> for the <c>menuMoreLanguages</c> dynamic menu. Returns a customUI
+        /// menu fragment whose items are every enabled-but-not-pinned language declared in
+        /// ribbon.xml, sorted by display label. Each item reuses <see cref="AddInButtonClicked"/>
+        /// so the dynamic-menu click path is identical to a pinned-button click path.
+        ///
+        /// <para>
+        /// The returned XML MUST declare the customUI namespace on the root &lt;menu&gt; element
+        /// or Office silently drops the menu (plan section 4.2.1 / reviewer 2.9). Built via
+        /// <see cref="XmlWriter"/> so labels containing &amp; / &lt; / &gt; / quotes are escaped
+        /// rather than concatenated raw.
+        /// </para>
+        /// </summary>
+        [System.CLSCompliant(false)]
+        public string GetMoreLanguagesMenu(IRibbonControl control)
+        {
+            try
+            {
+                LanguageSettings snap;
+                lock (_languagesLock) { snap = _languages; }
+                return BuildMoreLanguagesMenuXml(snap, LanguageRegistry.All);
+            }
+            catch (Exception ex)
+            {
+                // Never let a get* callback throw out of Office - it tears down the ribbon for
+                // the rest of the session. Log and return an empty (but well-formed) menu so
+                // the dropdown opens silently.
+                System.Diagnostics.Trace.TraceWarning("NoteHighlight2016: GetMoreLanguagesMenu threw; returning empty menu. " + ex);
+                return EmptyMoreLanguagesMenuXml();
+            }
+        }
+
+        // The customUI namespace declared on the root <menu> element of the dynamic-menu
+        // payload. Documented constant rather than an inline literal so tests can assert it.
+        internal const string CustomUiNamespace = "http://schemas.microsoft.com/office/2006/01/customui";
+
+        /// <summary>
+        /// Build the dynamic-menu XML for <see cref="GetMoreLanguagesMenu"/>. Pure / static so it
+        /// is exercised directly from unit tests without standing up an AddIn instance or an
+        /// IRibbonControl proxy. See plan section 4.2.1 for the wire-shape contract.
+        /// </summary>
+        internal static string BuildMoreLanguagesMenuXml(LanguageSettings settings,
+                                                         IReadOnlyList<LanguageDescriptor> registry)
+        {
+            // Build a tag->descriptor lookup once. Registry size is small (~30) so the
+            // dictionary is negligible compared to the LINQ alternatives.
+            var byTag = new Dictionary<string, LanguageDescriptor>(StringComparer.Ordinal);
+            if (registry != null)
+            {
+                foreach (var d in registry)
+                {
+                    if (d == null || string.IsNullOrEmpty(d.Tag)) continue;
+                    if (!byTag.ContainsKey(d.Tag)) byTag[d.Tag] = d;
+                }
+            }
+
+            // Enabled-but-not-pinned, intersected with the registry (we cannot render a
+            // descriptor we do not know about), sorted by display label using ordinal
+            // case-insensitive ordering so "Go" / "go" do not swap on different locales.
+            var items = new List<LanguageDescriptor>();
+            if (settings != null)
+            {
+                foreach (var tag in settings.Enabled)
+                {
+                    if (settings.IsPinned(tag)) continue;
+                    if (!byTag.TryGetValue(tag, out var d)) continue;
+                    items.Add(d);
+                }
+            }
+            items.Sort((a, b) => string.Compare(a.Label ?? a.Tag, b.Label ?? b.Tag, StringComparison.OrdinalIgnoreCase));
+
+            var settingsXw = new XmlWriterSettings
+            {
+                OmitXmlDeclaration = true,
+                ConformanceLevel = ConformanceLevel.Fragment,
+            };
+
+            using (var sw = new StringWriter(System.Globalization.CultureInfo.InvariantCulture))
+            {
+                using (var w = XmlWriter.Create(sw, settingsXw))
+                {
+                    w.WriteStartElement("menu", CustomUiNamespace);
+                    foreach (var d in items)
+                    {
+                        w.WriteStartElement("button", CustomUiNamespace);
+                        w.WriteAttributeString("id", "dyn_" + d.Tag);
+                        w.WriteAttributeString("label", d.Label ?? d.Tag);
+                        w.WriteAttributeString("tag", d.Tag);
+                        w.WriteAttributeString("onAction", "AddInButtonClicked");
+                        w.WriteAttributeString("image", string.IsNullOrEmpty(d.Image) ? "Other.png" : d.Image);
+                        if (!string.IsNullOrEmpty(d.Screentip))
+                            w.WriteAttributeString("screentip", d.Screentip);
+                        w.WriteEndElement();
+                    }
+                    w.WriteEndElement();
+                }
+                return sw.ToString();
+            }
+        }
+
+        private static string EmptyMoreLanguagesMenuXml()
+        {
+            return "<menu xmlns=\"" + CustomUiNamespace + "\"/>";
         }
 
         /// <summary>
