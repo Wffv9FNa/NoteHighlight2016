@@ -101,16 +101,21 @@ namespace NoteHighlightAddin
         /// </summary>
         internal static LanguageSettings CloneForEditing(LanguageSettings live, IReadOnlyList<string> defaultPinned)
         {
-            // LoadOrSeed against a null path gives us an in-memory instance seeded from
-            // defaultPinned; we then layer the current state on top so the dialog reflects what
-            // the user actually has today.
-            var clone = LanguageSettings.LoadOrSeed(path: null, knownTags: null, defaultPinned: defaultPinned ?? new string[0]);
-            if (live != null)
+            // When live is null, fall back to defaults so first-run / recovery still works.
+            if (live == null)
             {
-                // Replace the seeded pinned order with the live one.
-                clone.Reorder(live.Pinned.ToList());
-                foreach (var t in live.Enabled) clone.Enable(t);
+                return LanguageSettings.LoadOrSeed(path: null, knownTags: null,
+                    defaultPinned: defaultPinned ?? new string[0]);
             }
+
+            // Seed the clone from live.Pinned (NOT the global defaults) so any default-pinned tag
+            // the user has previously disabled stays disabled. SeedDefaults writes the seed into
+            // both _pinned and _enabled, so any default-pinned-but-user-disabled tag would
+            // otherwise be silently resurrected in _enabled - the Enable() loop below cannot
+            // un-do that, only add. Bug: a disabled "css" reappeared on every reopen.
+            var clone = LanguageSettings.LoadOrSeed(path: null, knownTags: null,
+                defaultPinned: live.Pinned.ToList());
+            foreach (var t in live.Enabled) clone.Enable(t);
             return clone;
         }
 

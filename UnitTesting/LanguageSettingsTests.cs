@@ -267,5 +267,57 @@ namespace UnitTesting
             Assert.IsTrue(s.IsEnabled("py"));
             Assert.IsTrue(s.IsEnabled("cs"));
         }
+
+        // --- CloneForEditing (regression: default-pinned tag could not be disabled) -----------
+
+        [TestMethod]
+        public void CloneForEditing_DisabledDefaultTag_StaysDisabled()
+        {
+            // The user disabled "css" (a Phase 1 default-pinned tag) in a prior session.
+            // The live state therefore has "css" in neither Pinned nor Enabled.
+            var live = LanguageSettings.LoadOrSeed(null, null, DefaultsPhase1);
+            live.Disable("css");
+            Assert.IsFalse(live.IsEnabled("css"), "Precondition: live state must not have css enabled.");
+
+            // Reopening the dialog calls CloneForEditing with the global DefaultsPhase1 fallback.
+            // Pre-fix, the clone was seeded from DefaultsPhase1 (which still contains "css")
+            // and Reorder only cleared _pinned, leaving _enabled untouched. The clone would
+            // therefore reappear with css enabled.
+            var clone = NoteHighlightAddin.LanguageSettingsForm.CloneForEditing(live, DefaultsPhase1);
+
+            Assert.IsFalse(clone.IsPinned("css"), "Clone must not re-pin css.");
+            Assert.IsFalse(clone.IsEnabled("css"), "Clone must not resurrect a disabled default-pinned tag.");
+        }
+
+        [TestMethod]
+        public void CloneForEditing_PreservesPinnedOrderAndExtraEnabled()
+        {
+            // Live state: pinned re-ordered, and an extra non-default tag enabled (not pinned).
+            var live = LanguageSettings.LoadOrSeed(null, null, DefaultsPhase1);
+            live.Reorder(new List<string> { "py", "cs", "js" });
+            live.Enable("go");
+
+            var clone = NoteHighlightAddin.LanguageSettingsForm.CloneForEditing(live, DefaultsPhase1);
+
+            CollectionAssert.AreEqual(new[] { "py", "cs", "js" }, clone.Pinned.ToArray());
+            Assert.IsTrue(clone.IsEnabled("go"), "Extra enabled tag must survive cloning.");
+            Assert.IsFalse(clone.IsPinned("go"));
+            // No leakage of un-pinned defaults into pinned.
+            Assert.IsFalse(clone.IsPinned("css"));
+            Assert.IsFalse(clone.IsPinned("html"));
+        }
+
+        [TestMethod]
+        public void CloneForEditing_NullLive_FallsBackToDefaults()
+        {
+            var clone = NoteHighlightAddin.LanguageSettingsForm.CloneForEditing(null, DefaultsPhase1);
+
+            Assert.AreEqual(DefaultsPhase1.Length, clone.Pinned.Count);
+            foreach (var t in DefaultsPhase1)
+            {
+                Assert.IsTrue(clone.IsPinned(t));
+                Assert.IsTrue(clone.IsEnabled(t));
+            }
+        }
     }
 }
