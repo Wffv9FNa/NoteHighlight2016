@@ -121,10 +121,33 @@ namespace NoteHighlightAddin
 
         private void LanguageSettingsForm_Shown(object sender, EventArgs e)
         {
-            // Mirror SettingsForm: bounce window state so SetForegroundWindow is consistent.
-            this.WindowState = FormWindowState.Minimized;
-            this.WindowState = FormWindowState.Normal;
-            NativeMethods.SetForegroundWindow(this.Handle);
+            // The form runs on a dedicated settings STA worker (see AddIn.EnsureSettingsWorker)
+            // which never holds Windows foreground, so a bare SetForegroundWindow gets demoted to
+            // a taskbar flash. Attach to the current foreground thread's input queue first - that
+            // is the standard Raymond-Chen-approved way to make SetForegroundWindow stick from
+            // a non-foreground thread. The TopMost flash is belt-and-braces: it forces the window
+            // above OneNote on first paint without staying always-on-top afterwards.
+            uint thisThread = NativeMethods.GetCurrentThreadId();
+            IntPtr fg = NativeMethods.GetForegroundWindow();
+            uint fgThread = fg != IntPtr.Zero ? NativeMethods.GetWindowThreadProcessId(fg, out _) : 0;
+
+            bool attached = false;
+            if (fgThread != 0 && fgThread != thisThread)
+            {
+                attached = NativeMethods.AttachThreadInput(thisThread, fgThread, true);
+            }
+            try
+            {
+                this.TopMost = true;
+                this.TopMost = false;
+                NativeMethods.SetForegroundWindow(this.Handle);
+                this.Activate();
+                this.Focus();
+            }
+            finally
+            {
+                if (attached) NativeMethods.AttachThreadInput(thisThread, fgThread, false);
+            }
         }
 
         // --- Grid plumbing -----------------------------------------------------------------

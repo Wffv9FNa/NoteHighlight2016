@@ -242,7 +242,7 @@ namespace NoteHighlightAddin
             this.MinimumSize = new System.Drawing.Size(520, 360);
             this.Name = "LanguageSettingsForm";
             this.ShowIcon = false;
-            this.ShowInTaskbar = false;
+            this.ShowInTaskbar = true;
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "NoteHighlight - Languages";
             this.Shown += new System.EventHandler(this.LanguageSettingsForm_Shown);
