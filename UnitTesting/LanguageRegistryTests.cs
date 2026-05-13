@@ -215,14 +215,209 @@ namespace UnitTesting
             // The no-arg overload resolves the addin directory via
             // AddIn.GetAddinDirectory() and then falls back to the embedded
             // copy. Under the test host that path may or may not contain a
-            // ribbon.xml; either way the registry must parse the real
-            // production languages.
+            // ribbon.override.xml; either way the registry must parse the
+            // real production languages.
             LanguageRegistry.Initialise();
 
             Assert.IsTrue(LanguageRegistry.IsInitialised);
             Assert.IsTrue(LanguageRegistry.All.Count >= 13,
                 "Expected at least 13 languages from the no-arg Initialise path; got " + LanguageRegistry.All.Count);
             Assert.IsNotNull(LanguageRegistry.ByTag("cs"));
+        }
+
+        // --- Bug 13.1 followup (2026-05-13 evening) ----------------------
+        // The following tests lock the contract for the "stale on-disk
+        // ribbon.xml beats the embedded copy" fix. They use isolated temp
+        // directories so the real addin source tree is not touched.
+
+        /// <summary>
+        /// Minimal valid ribbon.xml fragment that LanguageRegistry can parse
+        /// to produce a known descriptor set. Used by the fixture-based tests
+        /// below so each one is independent of ribbon.xml drift.
+        /// </summary>
+        private static string FixtureRibbon(params (string id, string tag, string label)[] buttons)
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.Append("<?xml version=\"1.0\" encoding=\"utf-8\"?>");
+            sb.Append("<customUI xmlns=\"http://schemas.microsoft.com/office/2009/07/customui\">");
+            sb.Append("<ribbon>");
+            sb.Append("<tabs>");
+            sb.Append("<tab id=\"tabFixture\" label=\"Fixture\">");
+            sb.Append("<group id=\"groupLanguage\" label=\"Language\">");
+            foreach (var b in buttons)
+            {
+                sb.Append("<button id=\"").Append(b.id).Append("\"")
+                  .Append(" tag=\"").Append(b.tag).Append("\"")
+                  .Append(" label=\"").Append(b.label).Append("\"")
+                  .Append(" image=\"Other.png\"")
+                  .Append(" onAction=\"AddInButtonClicked\" />");
+            }
+            sb.Append("</group>");
+            sb.Append("</tab>");
+            sb.Append("</tabs>");
+            sb.Append("</ribbon>");
+            sb.Append("</customUI>");
+            return sb.ToString();
+        }
+
+        private static string CreateTempDir(string prefix)
+        {
+            var dir = Path.Combine(Path.GetTempPath(), prefix + "-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(dir);
+            return dir;
+        }
+
+        [TestMethod]
+        public void Initialise_LegacyRibbonXmlPresent_IsIgnoredAndEmbeddedWins()
+        {
+            // Bug 13.1 followup safety net: a legacy ribbon.xml left behind by
+            // an old MSI (Permanent=TRUE component, never uninstalled) MUST
+            // NOT be read - it would beat the embedded canonical copy with
+            // stale content. The registry falls back to the embedded copy and
+            // emits a Trace warning naming the resolved legacy path.
+            var dir = CreateTempDir("nh-tests-legacy");
+            try
+            {
+                // Write a deliberately tiny legacy ribbon.xml with one button
+                // only - far smaller than the real embedded copy, so we can
+                // tell the embedded copy won by counting.
+                var legacy = Path.Combine(dir, LanguageRegistry.LegacyOnDiskRibbonFileName);
+                File.WriteAllText(legacy, FixtureRibbon(("buttonStale", "stale-only", "Stale")));
+
+                using (var listener = new TraceCaptureListener())
+                {
+                    LanguageRegistry.Initialise(dir);
+
+                    Assert.IsTrue(LanguageRegistry.IsInitialised);
+                    Assert.IsTrue(LanguageRegistry.All.Count >= 13,
+                        "Embedded copy should have won; instead got " + LanguageRegistry.All.Count + " (would mean the legacy ribbon.xml was read).");
+                    Assert.IsNull(LanguageRegistry.ByTag("stale-only"),
+                        "The legacy ribbon.xml tag must NOT appear - the embedded copy should be canonical.");
+
+                    // The Trace warning must name the resolved path so a user
+                    // can grep their trace log for the bad file.
+                    Assert.IsTrue(
+                        listener.Messages.Any(m => m.IndexOf("legacy", StringComparison.OrdinalIgnoreCase) >= 0
+                                                && m.IndexOf(legacy, StringComparison.OrdinalIgnoreCase) >= 0),
+                        "Expected a Trace warning mentioning 'legacy' and the resolved path. Captured: " + string.Join(" | ", listener.Messages));
+                }
+            }
+            finally
+            {
+                SafeDeleteDir(dir);
+            }
+        }
+
+        [TestMethod]
+        public void Initialise_OverrideXmlPresent_IsPreferredOverEmbedded()
+        {
+            // Hot-edit path: ribbon.override.xml next to the DLL wins over
+            // the embedded copy. End-user installs never ship this filename,
+            // so this only fires for devs.
+            var dir = CreateTempDir("nh-tests-override");
+            try
+            {
+                var overridePath = Path.Combine(dir, LanguageRegistry.OnDiskRibbonFileName);
+                File.WriteAllText(overridePath, FixtureRibbon(
+                    ("buttonAlpha", "alpha", "Alpha"),
+                    ("buttonBeta", "beta", "Beta")));
+
+                LanguageRegistry.Initialise(dir);
+
+                Assert.IsTrue(LanguageRegistry.IsInitialised);
+                Assert.AreEqual(2, LanguageRegistry.All.Count,
+                    "Override file should be the only source; embedded copy must NOT have been used.");
+                Assert.IsNotNull(LanguageRegistry.ByTag("alpha"));
+                Assert.IsNotNull(LanguageRegistry.ByTag("beta"));
+                Assert.IsNull(LanguageRegistry.ByTag("cs"),
+                    "Embedded copy must not contribute when override is present.");
+            }
+            finally
+            {
+                SafeDeleteDir(dir);
+            }
+        }
+
+        [TestMethod]
+        public void Initialise_BothLegacyAndOverridePresent_OverrideWins_LegacyWarned()
+        {
+            // The worst case: a dev with a legacy ribbon.xml lying around AND
+            // a deliberate ribbon.override.xml. The override must still win,
+            // and the legacy file must still produce a Trace warning so the
+            // dev knows to clean it up.
+            var dir = CreateTempDir("nh-tests-both");
+            try
+            {
+                var legacy = Path.Combine(dir, LanguageRegistry.LegacyOnDiskRibbonFileName);
+                File.WriteAllText(legacy, FixtureRibbon(("buttonStale", "stale-only", "Stale")));
+
+                var overridePath = Path.Combine(dir, LanguageRegistry.OnDiskRibbonFileName);
+                File.WriteAllText(overridePath, FixtureRibbon(("buttonAlpha", "alpha", "Alpha")));
+
+                using (var listener = new TraceCaptureListener())
+                {
+                    LanguageRegistry.Initialise(dir);
+
+                    Assert.IsTrue(LanguageRegistry.IsInitialised);
+                    Assert.AreEqual(1, LanguageRegistry.All.Count,
+                        "Override file should win; got " + LanguageRegistry.All.Count + " buttons.");
+                    Assert.IsNotNull(LanguageRegistry.ByTag("alpha"));
+                    Assert.IsNull(LanguageRegistry.ByTag("stale-only"));
+
+                    Assert.IsTrue(
+                        listener.Messages.Any(m => m.IndexOf("legacy", StringComparison.OrdinalIgnoreCase) >= 0
+                                                && m.IndexOf(legacy, StringComparison.OrdinalIgnoreCase) >= 0),
+                        "Legacy-file warning still expected when an override file is also present. Captured: " + string.Join(" | ", listener.Messages));
+                }
+            }
+            finally
+            {
+                SafeDeleteDir(dir);
+            }
+        }
+
+        [TestMethod]
+        public void OnDiskRibbonFileName_IsRibbonOverrideXml()
+        {
+            // Locks the filename contract: end-user MSIs must not ship this
+            // name. If anyone renames it back to "ribbon.xml" this test will
+            // shout (and so will the MSI safety: there is no MSI row matching
+            // ribbon.override.xml, see Setup.vdproj).
+            Assert.AreEqual("ribbon.override.xml", LanguageRegistry.OnDiskRibbonFileName);
+            Assert.AreEqual("ribbon.xml", LanguageRegistry.LegacyOnDiskRibbonFileName);
+        }
+
+        private static void SafeDeleteDir(string dir)
+        {
+            try { if (Directory.Exists(dir)) Directory.Delete(dir, true); } catch { /* best-effort cleanup */ }
+        }
+
+        /// <summary>
+        /// Captures Trace.TraceWarning / TraceError / TraceInformation output
+        /// for the duration of a test. Registered globally via
+        /// <see cref="System.Diagnostics.Trace.Listeners"/>; <c>Dispose</c>
+        /// unregisters so the next test starts clean.
+        /// </summary>
+        private sealed class TraceCaptureListener : System.Diagnostics.TraceListener
+        {
+            public System.Collections.Generic.List<string> Messages { get; } = new System.Collections.Generic.List<string>();
+
+            public TraceCaptureListener()
+            {
+                System.Diagnostics.Trace.Listeners.Add(this);
+            }
+
+            public override void Write(string message) { if (!string.IsNullOrEmpty(message)) Messages.Add(message); }
+            public override void WriteLine(string message) { if (!string.IsNullOrEmpty(message)) Messages.Add(message); }
+
+            protected override void Dispose(bool disposing)
+            {
+                if (disposing)
+                {
+                    System.Diagnostics.Trace.Listeners.Remove(this);
+                }
+                base.Dispose(disposing);
+            }
         }
     }
 }
