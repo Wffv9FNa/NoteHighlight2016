@@ -94,24 +94,34 @@ namespace UnitTesting
         }
 
         [TestMethod]
-        public void Initialise_MissingRibbonXml_DoesNotThrowAndLeavesAllEmpty()
+        public void Initialise_MissingRibbonXml_DoesNotThrowAndFallsBackToEmbedded()
         {
+            // Bug 13.1 fix changed the contract here: when no on-disk ribbon.xml
+            // is found at addinDirectory, Initialise now falls back to the
+            // embedded Resources.ribbon copy rather than leaving All empty.
+            // (The "leave empty" behaviour only applies when BOTH sources fail,
+            // which is exercised by an out-of-process unit test with a mocked
+            // resource ManagerStream - out of scope here.)
             var bogus = Path.Combine(Path.GetTempPath(), "nh-tests-missing-" + Guid.NewGuid().ToString("N"));
 
             // Must not throw.
             LanguageRegistry.Initialise(bogus);
 
             Assert.IsTrue(LanguageRegistry.IsInitialised);
-            Assert.AreEqual(0, LanguageRegistry.All.Count);
+            Assert.IsTrue(LanguageRegistry.All.Count >= 13,
+                "Embedded fallback should populate the registry; got " + LanguageRegistry.All.Count);
         }
 
         [TestMethod]
         public void Initialise_NullDirectory_DoesNotThrow()
         {
+            // Same contract as the test above: null directory means "skip the
+            // on-disk hot-edit step, go straight to the embedded copy".
             LanguageRegistry.Initialise(null);
 
             Assert.IsTrue(LanguageRegistry.IsInitialised);
-            Assert.AreEqual(0, LanguageRegistry.All.Count);
+            Assert.IsTrue(LanguageRegistry.All.Count >= 13,
+                "Embedded fallback should populate the registry even with a null addinDirectory; got " + LanguageRegistry.All.Count);
         }
 
         [TestMethod]
@@ -124,6 +134,44 @@ namespace UnitTesting
             LanguageRegistry.Initialise(Path.Combine(Path.GetTempPath(), "nh-tests-second-" + Guid.NewGuid().ToString("N")));
 
             Assert.AreEqual(firstCount, LanguageRegistry.All.Count, "Second Initialise should be a no-op.");
+        }
+
+        [TestMethod]
+        public void Initialise_EmbeddedFallback_PopulatesRealLanguages()
+        {
+            // Bug 13.1 / Option B: when no on-disk ribbon.xml is present next to
+            // the addin directory we are told to consult, Initialise must fall
+            // back to the embedded Resources.ribbon copy and still expose the
+            // canonical language set. Pointing at a guaranteed-missing temp
+            // directory exercises that fallback path.
+            var bogus = Path.Combine(Path.GetTempPath(), "nh-tests-embedded-" + Guid.NewGuid().ToString("N"));
+            Assert.IsFalse(File.Exists(Path.Combine(bogus, "ribbon.xml")), "Sanity: bogus dir must not contain ribbon.xml.");
+
+            LanguageRegistry.Initialise(bogus);
+
+            Assert.IsTrue(LanguageRegistry.IsInitialised, "Registry should report initialised after embedded fallback.");
+            Assert.IsTrue(LanguageRegistry.All.Count >= 13,
+                "Embedded ribbon resource should yield at least the 13 production languages; got " + LanguageRegistry.All.Count);
+
+            // Spot-check a couple of canonical tags that ship in the embedded ribbon.xml.
+            Assert.IsNotNull(LanguageRegistry.ByTag("cs"), "Embedded ribbon.xml must declare 'cs'.");
+            Assert.IsNotNull(LanguageRegistry.ByTag("py"), "Embedded ribbon.xml must declare 'py'.");
+        }
+
+        [TestMethod]
+        public void Initialise_NoArgOverload_UsesEmbeddedOrOnDisk()
+        {
+            // The no-arg overload resolves the addin directory via
+            // AddIn.GetAddinDirectory() and then falls back to the embedded
+            // copy. Under the test host that path may or may not contain a
+            // ribbon.xml; either way the registry must parse the real
+            // production languages.
+            LanguageRegistry.Initialise();
+
+            Assert.IsTrue(LanguageRegistry.IsInitialised);
+            Assert.IsTrue(LanguageRegistry.All.Count >= 13,
+                "Expected at least 13 languages from the no-arg Initialise path; got " + LanguageRegistry.All.Count);
+            Assert.IsNotNull(LanguageRegistry.ByTag("cs"));
         }
     }
 }

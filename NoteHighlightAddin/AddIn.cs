@@ -147,33 +147,54 @@ namespace NoteHighlightAddin
 
         private string LoadRibbon()
         {
+            // ribbon.xml is embedded into the assembly (via Properties\Resources.resx
+            // -> Resources.ribbon) because it is the unversioned-file class of MSI
+            // upgrade bug: Windows Installer skips replacing unversioned files when
+            // their mtime != ctime on disk, so an MSI upgrade would silently leave
+            // an older ribbon.xml in place. The DLL is versioned and always replaced
+            // on upgrade, so the embedded copy moves with it. See
+            // .local/docs/bugs/msi-ribbon-stale-on-upgrade.md (bug 13.1).
+            //
+            // Fallback order:
+            //   1. On-disk ribbon.xml next to the DLL, if present. Dev / diagnostic
+            //      hot-edit convenience: edit the file, restart OneNote, no rebuild.
+            //   2. Embedded Resources.ribbon (the canonical end-user path).
+            //   3. Empty string + MessageBox (existing error path).
+
             try
             {
+                var addinDir = GetAddinDirectory();
+                if (!string.IsNullOrEmpty(addinDir))
+                {
+                    var onDisk = Path.Combine(addinDir, "ribbon.xml");
+                    // File.Exists guard mirrors the rule in feedback_com_addin_path_traps.md -
+                    // never assume a sibling file is present under COM activation.
+                    if (File.Exists(onDisk))
+                    {
+                        return File.ReadAllText(onDisk);
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                // Hot-edit fallback failure is non-fatal; fall through to the embedded copy.
+                System.Diagnostics.Trace.TraceWarning("NoteHighlight2016: on-disk ribbon.xml read failed; falling back to embedded resource. " + e.Message);
+            }
 
-                // Use the defining assembly (typeof(AddIn).Assembly) rather than
-                // GetCallingAssembly(): the latter resolves to whichever assembly
-                // happens to call GetCustomUI - under cross-AppDomain COM activation
-                // that is mscorlib (shadow-copied path) or ONENOTE.EXE itself, neither
-                // of which sit next to ribbon.xml. The current call only works because
-                // the JIT inlines this helper into the COM entry point.
-                var assemblyLocation = typeof(AddIn).Assembly.Location;
-                if (string.IsNullOrEmpty(assemblyLocation))
-                    assemblyLocation = new Uri(typeof(AddIn).Assembly.CodeBase).LocalPath;
-                var workingDirectory = Path.Combine(ProcessHelper.GetDirectoryFromPath(assemblyLocation), "ribbon.xml");
+            try
+            {
+                var embedded = Properties.Resources.ribbon;
+                if (!string.IsNullOrEmpty(embedded))
+                    return embedded;
 
-                string file = File.ReadAllText(workingDirectory);
-
-                return file;
-
+                MessageBox.Show("Exception from Addin.LoadRibbon: embedded ribbon resource was empty.");
+                return "";
             }
             catch (Exception e)
             {
                 MessageBox.Show("Exception from Addin.LoadRibbon:" + e.Message);
                 return "";
             }
-
-
-
         }
 
         public void OnAddInsUpdate(ref Array custom)
@@ -240,7 +261,9 @@ namespace NoteHighlightAddin
 			// neither call must escape into OnConnection or Office aborts add-in load.
 			try
 			{
-				LanguageRegistry.Initialise(GetAddinDirectory());
+				// No-arg overload: prefers an on-disk ribbon.xml for dev hot-edit,
+				// falls back to the embedded canonical copy. See bug 13.1 / Option B.
+				LanguageRegistry.Initialise();
 			}
 			catch (Exception ex)
 			{

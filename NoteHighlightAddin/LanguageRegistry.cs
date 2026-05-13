@@ -110,9 +110,38 @@ namespace NoteHighlightAddin
         }
 
         /// <summary>
-        /// Parse ribbon.xml from <paramref name="addinDirectory"/>. Idempotent
-        /// (subsequent calls are a no-op). Never throws - on any failure the
-        /// registry is left empty and a Trace warning is emitted.
+        /// Parse the embedded ribbon.xml resource, preferring an on-disk copy
+        /// next to the DLL if present (dev / diagnostic hot-edit). Never throws.
+        /// Equivalent to <see cref="Initialise(string)"/> with the addin directory
+        /// resolved from <see cref="AddIn.GetAddinDirectory"/>. See bug 13.1
+        /// (.local/docs/bugs/msi-ribbon-stale-on-upgrade.md) for why the canonical
+        /// source is now the embedded copy rather than the on-disk file.
+        /// </summary>
+        public static void Initialise()
+        {
+            Initialise(AddIn.GetAddinDirectory());
+        }
+
+        /// <summary>
+        /// Parse ribbon.xml. Idempotent (subsequent calls are a no-op). Never
+        /// throws - on any failure the registry is left empty and a Trace
+        /// warning is emitted.
+        ///
+        /// <para>
+        /// Source order (post bug 13.1 fix): if <paramref name="addinDirectory"/>
+        /// contains a ribbon.xml file on disk, parse that (dev / diagnostic
+        /// hot-edit convenience). Otherwise fall back to the embedded
+        /// <c>Properties.Resources.ribbon</c> copy, which is the canonical end-user
+        /// path because the DLL is versioned and always replaces on MSI upgrade -
+        /// unlike the unversioned on-disk ribbon.xml, which Windows Installer can
+        /// legitimately skip on upgrade.
+        /// </para>
+        ///
+        /// <para>
+        /// The path overload remains for unit-test fixtures that write a
+        /// ribbon.xml to a temp directory and want it picked up deterministically;
+        /// production callers should prefer <see cref="Initialise()"/>.
+        /// </para>
         /// </summary>
         public static void Initialise(string addinDirectory)
         {
@@ -123,38 +152,67 @@ namespace NoteHighlightAddin
             string ribbonPath = null;
             try
             {
-                if (string.IsNullOrEmpty(addinDirectory))
+                XDocument doc = null;
+                string sourceDescription = null;
+
+                // 1. Hot-edit / diagnostic path: a ribbon.xml file next to the DLL.
+                //    Memory rule "feedback_com_addin_path_traps.md": validate
+                //    File.Exists and fail soft so we can fall through to the
+                //    embedded copy rather than dying under COM activation drift.
+                if (!string.IsNullOrEmpty(addinDirectory))
                 {
-                    Trace.TraceError("NoteHighlight2016: LanguageRegistry.Initialise called with empty addinDirectory; leaving registry empty.");
-                    return;
+                    ribbonPath = Path.Combine(addinDirectory, "ribbon.xml");
+                    if (File.Exists(ribbonPath))
+                    {
+                        try
+                        {
+                            doc = XDocument.Load(ribbonPath);
+                            sourceDescription = ribbonPath;
+                        }
+                        catch (Exception ex)
+                        {
+                            Trace.TraceWarning("NoteHighlight2016: failed to parse on-disk '" + ribbonPath + "'; falling back to embedded resource. " + ex.GetType().Name + ": " + ex.Message);
+                            doc = null;
+                        }
+                    }
                 }
 
-                ribbonPath = Path.Combine(addinDirectory, "ribbon.xml");
+                // 2. Embedded canonical copy.
+                if (doc == null)
+                {
+                    string embedded;
+                    try
+                    {
+                        embedded = Properties.Resources.ribbon;
+                    }
+                    catch (Exception ex)
+                    {
+                        Trace.TraceError("NoteHighlight2016: failed to read embedded ribbon resource; " + ex.GetType().Name + ": " + ex.Message);
+                        return;
+                    }
 
-                // Memory-rule "feedback_com_addin_path_traps.md": validate
-                // File.Exists and fail loudly with the resolved path so callers
-                // can debug COM-activation path drift.
-                if (!File.Exists(ribbonPath))
-                {
-                    Trace.TraceError("NoteHighlight2016: ribbon.xml not found at '" + ribbonPath + "'; LanguageRegistry left empty.");
-                    return;
-                }
+                    if (string.IsNullOrEmpty(embedded))
+                    {
+                        Trace.TraceError("NoteHighlight2016: embedded ribbon resource is empty and no on-disk ribbon.xml found (looked at '" + (ribbonPath ?? "<no addin directory>") + "'); LanguageRegistry left empty.");
+                        return;
+                    }
 
-                XDocument doc;
-                try
-                {
-                    doc = XDocument.Load(ribbonPath);
-                }
-                catch (Exception ex)
-                {
-                    Trace.TraceError("NoteHighlight2016: failed to parse '" + ribbonPath + "'; " + ex.GetType().Name + ": " + ex.Message);
-                    return;
+                    try
+                    {
+                        doc = XDocument.Parse(embedded);
+                        sourceDescription = "<embedded Resources.ribbon>";
+                    }
+                    catch (Exception ex)
+                    {
+                        Trace.TraceError("NoteHighlight2016: failed to parse embedded ribbon resource; " + ex.GetType().Name + ": " + ex.Message);
+                        return;
+                    }
                 }
 
                 var root = doc.Root;
                 if (root == null)
                 {
-                    Trace.TraceError("NoteHighlight2016: ribbon.xml at '" + ribbonPath + "' has no root element.");
+                    Trace.TraceError("NoteHighlight2016: ribbon.xml (" + (sourceDescription ?? "<unknown source>") + ") has no root element.");
                     return;
                 }
 
