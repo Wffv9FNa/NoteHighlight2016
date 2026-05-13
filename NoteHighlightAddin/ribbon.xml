@@ -39,6 +39,12 @@
                   <button id="buttonSwift" label="Swift" size="large" screentip="Enter Swift Code" onAction="AddInButtonClicked" tag="swift"  image="Other.png" getVisible="GetLanguageButtonVisible"/>
                   <button id="buttonVisualBasic" label="Visual Basic" size="large" screentip="Enter Visual Basic Code" onAction="AddInButtonClicked" tag="vb"  image="Other.png" getVisible="GetLanguageButtonVisible"/>
 				  <button id="buttonTypeScript" label="TypeScript" size="large" screentip="Enter Type Script Code" onAction="AddInButtonClicked" tag="ts"  image="Other.png" getVisible="GetLanguageButtonVisible"/>
+                  <button id="buttonAutoHotkey" label="AutoHotkey" size="large" screentip="Enter AutoHotkey Code" onAction="AddInButtonClicked" tag="autohotkey"  image="Other.png" getVisible="GetLanguageButtonVisible"/>
+                  <button id="buttonDockerfile" label="Dockerfile" size="large" screentip="Enter Dockerfile Code" onAction="AddInButtonClicked" tag="dockerfile"  image="Other.png" getVisible="GetLanguageButtonVisible"/>
+                  <button id="buttonKotlin" label="Kotlin" size="large" screentip="Enter Kotlin Code" onAction="AddInButtonClicked" tag="kotlin"  image="Other.png" getVisible="GetLanguageButtonVisible"/>
+                  <button id="buttonLaTeX" label="LaTeX" size="large" screentip="Enter LaTeX Code" onAction="AddInButtonClicked" tag="tex"  image="Other.png" getVisible="GetLanguageButtonVisible"/>
+                  <button id="buttonRust" label="Rust" size="large" screentip="Enter Rust Code" onAction="AddInButtonClicked" tag="rust"  image="Other.png" getVisible="GetLanguageButtonVisible"/>
+                  <button id="buttonYAML" label="YAML" size="large" screentip="Enter YAML Code" onAction="AddInButtonClicked" tag="yaml"  image="Other.png" getVisible="GetLanguageButtonVisible"/>
                   <dynamicMenu id="menuMoreLanguages"
                                label="More languages..."
                                size="large"
