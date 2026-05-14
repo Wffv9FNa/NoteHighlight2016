@@ -178,6 +178,27 @@ namespace UnitTesting
         }
 
         [TestMethod]
+        public void RemovedLanguages_AreNotRegistered()
+        {
+            // Plan section 4 Phase 1: locks the prune. A failure here means a
+            // re-added button slipped back into ribbon.xml without a matching plan
+            // entry, or the prune commit was partially reverted.
+            LanguageRegistry.Initialise(AddinSourceDir);
+
+            var removed = new[]
+            {
+                "clojure", "conf", "fsharp", "go", "haskell", "lisp",
+                "logtalk", "make", "matlab", "pas", "r", "swift",
+            };
+
+            foreach (var tag in removed)
+            {
+                Assert.IsNull(LanguageRegistry.ByTag(tag),
+                    "ribbon.xml must NOT declare a button with tag='" + tag + "' after the 4.0 prune.");
+            }
+        }
+
+        [TestMethod]
         public void NewLanguages_HaveMatchingLangDefFiles()
         {
             // Plan section 5.2: build-time sanity check. Each new ribbon tag
