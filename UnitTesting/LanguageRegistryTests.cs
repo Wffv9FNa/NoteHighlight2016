@@ -199,6 +199,62 @@ namespace UnitTesting
         }
 
         [TestMethod]
+        public void RibbonImages_AllExistInResourcesFolder()
+        {
+            // Plan section 4 Phase 3: every <button image="..."> in ribbon.xml
+            // must point at a file that ships in NoteHighlightAddin/Resources/.
+            // A missing file would surface at runtime only when the user opens
+            // the ribbon - this catches it at build time.
+            LanguageRegistry.Initialise(AddinSourceDir);
+
+            var resourcesDir = Path.Combine(RepoRoot, "NoteHighlightAddin", "Resources");
+            Assert.IsTrue(Directory.Exists(resourcesDir), "Resources directory must exist.");
+
+            foreach (var d in LanguageRegistry.All)
+            {
+                Assert.IsFalse(string.IsNullOrEmpty(d.Image),
+                    "Button '" + d.ButtonId + "' must have an image= attribute.");
+                var path = Path.Combine(resourcesDir, d.Image);
+                Assert.IsTrue(File.Exists(path),
+                    "ribbon.xml button '" + d.ButtonId + "' references missing image: " + path);
+            }
+
+            // Explicit allowlist: non-language ribbon elements (menuMoreLanguages,
+            // buttonSettings, buttonLanguages) all use Other.png and are NOT
+            // enumerated by LanguageRegistry. Assert that file is present so the
+            // test fails loudly if a future refactor deletes it.
+            var otherPng = Path.Combine(resourcesDir, "Other.png");
+            Assert.IsTrue(File.Exists(otherPng),
+                "Other.png must remain in Resources/ for menuMoreLanguages, buttonSettings and buttonLanguages: " + otherPng);
+        }
+
+        [TestMethod]
+        public void RibbonImages_AllListedInCsproj()
+        {
+            // Plan section 4 Phase 3: every image referenced by a ribbon button
+            // must also be listed in NoteHighlightAddin.csproj as a <Content>
+            // item, otherwise the MSI will not deploy it.
+            LanguageRegistry.Initialise(AddinSourceDir);
+
+            var csprojPath = Path.Combine(RepoRoot, "NoteHighlightAddin", "NoteHighlightAddin.csproj");
+            Assert.IsTrue(File.Exists(csprojPath), "csproj must exist at " + csprojPath);
+            var csprojText = File.ReadAllText(csprojPath);
+
+            foreach (var d in LanguageRegistry.All)
+            {
+                var needle = "Resources\\" + d.Image;
+                Assert.IsTrue(csprojText.IndexOf(needle, StringComparison.OrdinalIgnoreCase) >= 0,
+                    "csproj is missing a <Content Include> entry for '" + needle + "' (button " + d.ButtonId + ").");
+            }
+
+            // Explicit allowlist mirror of 5.2: Other.png is referenced by the
+            // non-language ribbon elements and must remain in the csproj content
+            // block so the MSI deploys it.
+            Assert.IsTrue(csprojText.IndexOf("Resources\\Other.png", StringComparison.OrdinalIgnoreCase) >= 0,
+                "csproj is missing a <Content Include> entry for 'Resources\\Other.png' (menuMoreLanguages, buttonSettings, buttonLanguages).");
+        }
+
+        [TestMethod]
         public void NewLanguages_HaveMatchingLangDefFiles()
         {
             // Plan section 5.2: build-time sanity check. Each new ribbon tag
