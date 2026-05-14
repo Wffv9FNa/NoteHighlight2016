@@ -255,6 +255,59 @@ namespace UnitTesting
         }
 
         [TestMethod]
+        public void RibbonImages_AllResolveAsEmbeddedResources()
+        {
+            // Regression for bd5ad71: AddIn.GetImage resolves every ribbon button
+            // icon by reflecting over Properties.Resources - the icon must exist
+            // as an *embedded ResX resource*, not merely as a file on disk or a
+            // csproj <Content> row. The 4.0 icon refresh added the short-name
+            // PNGs only to disk + csproj and dropped the ResX entries, so every
+            // language button rendered with no icon. This mirrors GetImage's
+            // reflection exactly so a future ResX drift fails here, not in
+            // OneNote.
+            LanguageRegistry.Initialise(AddinSourceDir);
+
+            var resourcesType = typeof(LanguageRegistry).Assembly
+                .GetType("NoteHighlightAddin.Properties.Resources");
+            Assert.IsNotNull(resourcesType, "NoteHighlightAddin.Properties.Resources type must exist.");
+
+            // Same BindingFlags as AddIn.GetImage.
+            const System.Reflection.BindingFlags flags =
+                System.Reflection.BindingFlags.Static
+                | System.Reflection.BindingFlags.Instance
+                | System.Reflection.BindingFlags.Public
+                | System.Reflection.BindingFlags.NonPublic;
+
+            foreach (var d in LanguageRegistry.All)
+            {
+                Assert.IsFalse(string.IsNullOrEmpty(d.Image),
+                    "Button '" + d.ButtonId + "' must have an image= attribute.");
+
+                // GetImage strips the extension to derive the resource name.
+                var propertyName = d.Image.Substring(0, d.Image.IndexOf('.'));
+                var prop = resourcesType.GetProperty(propertyName, flags);
+                Assert.IsNotNull(prop,
+                    "Properties.Resources has no member '" + propertyName + "' for ribbon button '"
+                    + d.ButtonId + "' (image=" + d.Image + "). Add a <data> entry to Resources.resx "
+                    + "and a strongly-typed accessor to Resources.Designer.cs.");
+
+                var value = prop.GetValue(null, null);
+                Assert.IsNotNull(value,
+                    "Properties.Resources." + propertyName + " resolved to null - the ResXFileRef "
+                    + "target is probably missing or unembedded.");
+                Assert.AreEqual("System.Drawing.Bitmap", value.GetType().FullName,
+                    "Properties.Resources." + propertyName + " must be a Bitmap; got " + value.GetType().FullName);
+            }
+
+            // Explicit allowlist mirror: Other.png backs the non-language ribbon
+            // elements and is loaded through the same GetImage path.
+            var otherProp = resourcesType.GetProperty("Other", flags);
+            Assert.IsNotNull(otherProp,
+                "Properties.Resources must declare 'Other' for menuMoreLanguages, buttonSettings and buttonLanguages.");
+            Assert.IsNotNull(otherProp.GetValue(null, null), "Properties.Resources.Other resolved to null.");
+        }
+
+        [TestMethod]
         public void NewLanguages_HaveMatchingLangDefFiles()
         {
             // Plan section 5.2: build-time sanity check. Each new ribbon tag
