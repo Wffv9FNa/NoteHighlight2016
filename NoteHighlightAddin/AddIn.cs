@@ -621,16 +621,16 @@ namespace NoteHighlightAddin
         }
 
         /// <summary>
-        /// <c>getImage</c> for a <c>slotLangNN</c> slot button. Per-control <c>getImage</c> returns
-        /// <see cref="stdole.IPictureDisp"/> (NOT <c>IStream</c> - that is the <c>loadImage</c>
-        /// contract, see <see cref="GetImage(string)"/>). Resolves the slot to a descriptor, loads
-        /// the named bitmap from <c>Properties.Resources</c> and converts it to an
-        /// <see cref="stdole.IPictureDisp"/>. On an unresolved slot (or any exception) it returns
-        /// the <c>Other.png</c> picture so a slot never shows a broken-icon glyph in the brief
-        /// window between an invalidate and re-collection. Does NOT self-invalidate.
+        /// <c>getImage</c> for a <c>slotLangNN</c> slot button. Resolves the slot to a descriptor,
+        /// loads the named bitmap from <c>Properties.Resources</c> and returns it as a COM
+        /// <see cref="IStream"/> via <see cref="BuildImageStream"/> - the same proven mechanism
+        /// the customUI <c>loadImage</c> callback (<see cref="GetImage(string)"/>) uses. On an
+        /// unresolved slot (or any exception) it returns the <c>Other.png</c> image so a slot
+        /// never shows a broken-icon glyph in the brief window between an invalidate and
+        /// re-collection. Does NOT self-invalidate.
         /// </summary>
         [System.CLSCompliant(false)]
-        public stdole.IPictureDisp GetSlotImage(IRibbonControl control)
+        public IStream GetSlotImage(IRibbonControl control)
         {
             try
             {
@@ -643,17 +643,14 @@ namespace NoteHighlightAddin
                         imageName = desc.Image;
                 }
 
-                Bitmap bmp = LoadImageBitmapByName(imageName) ?? LoadImageBitmapByName("Other.png");
-                if (bmp == null) return null;
-                return RibbonImageShim.ToPictureDisp(bmp);
+                return BuildImageStream(imageName) ?? BuildImageStream("Other.png");
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Trace.TraceWarning("NoteHighlight2016: GetSlotImage threw; falling back to Other.png. " + ex);
                 try
                 {
-                    Bitmap fallback = LoadImageBitmapByName("Other.png");
-                    return fallback == null ? null : RibbonImageShim.ToPictureDisp(fallback);
+                    return BuildImageStream("Other.png");
                 }
                 catch (Exception ex2)
                 {
@@ -1187,9 +1184,9 @@ namespace NoteHighlightAddin
         /// Reflects over <c>Properties.Resources</c> by name and returns the matching
         /// <see cref="Bitmap"/>, or <c>null</c> if the resource is missing or is not a Bitmap.
         /// Shared lookup core for both image callbacks: <see cref="GetImage(string)"/>
-        /// (the <c>loadImage</c> path, wraps the result as <c>IStream</c>) and
-        /// <see cref="GetSlotImage"/> (the per-control <c>getImage</c> path, converts to
-        /// <see cref="stdole.IPictureDisp"/>).
+        /// (the customUI <c>loadImage</c> path) and <see cref="GetSlotImage"/> (the
+        /// per-control <c>getImage</c> path). Both wrap the result as a COM <c>IStream</c>
+        /// via <see cref="BuildImageStream"/>.
         ///
         /// <para>
         /// Memory rule project_ribbon_icons_load_via_resx_reflection still applies: every image
@@ -1226,22 +1223,42 @@ namespace NoteHighlightAddin
         /// <summary>
         /// Specified in Ribbon.xml as the root <c>loadImage</c> callback, this method returns the
         /// image to display on a ribbon button declared with a static <c>image=</c> attribute.
-        /// The <c>loadImage</c> contract returns <c>IStream</c> (contrast <see cref="GetSlotImage"/>,
-        /// the per-control <c>getImage</c> callback, which returns <see cref="stdole.IPictureDisp"/>).
+        /// Returns a COM <c>IStream</c> via <see cref="BuildImageStream"/> - the same mechanism
+        /// <see cref="GetSlotImage"/> (the per-control <c>getImage</c> callback) uses.
         /// </summary>
         /// <param name="imageName"></param>
         /// <returns></returns>
         public IStream GetImage(string imageName)
 		{
-            // H7: null-guard the reflected resource lookup. If the resource is missing
-            // (e.g. someone added a button referencing an image that was not embedded),
-            // return null so Office falls back to a default icon rather than crashing the
-            // whole ribbon with "An error occurred while creating the ribbon".
+            return BuildImageStream(imageName);
+		}
+
+        /// <summary>
+        /// Loads a named resource bitmap and serialises it into a COM <see cref="IStream"/>
+        /// (PNG bytes, position rewound to 0). Shared by <see cref="GetImage(string)"/> (the
+        /// customUI <c>loadImage</c> path) and <see cref="GetSlotImage"/> (the per-control
+        /// <c>getImage</c> path).
+        ///
+        /// <para>
+        /// Both ribbon image callbacks in this add-in return <c>IStream</c>. The Office ribbon
+        /// in this shared-add-in host consumes an <c>IStream</c> from a <c>getImage</c> callback
+        /// just as it does from <c>loadImage</c>; the earlier <c>stdole.IPictureDisp</c> route
+        /// (via an <c>AxHost</c> shim) produced a picture Office would not bind, so every slot
+        /// button rendered blank. Returning the same <c>CCOMStreamWrapper</c> the known-good
+        /// <c>loadImage</c> path uses keeps both callbacks on one proven mechanism.
+        /// </para>
+        ///
+        /// Returns <c>null</c> if the resource is missing (e.g. a button references an image
+        /// that was not embedded) so Office falls back to a default icon rather than crashing
+        /// the whole ribbon with "An error occurred while creating the ribbon".
+        /// </summary>
+        private static IStream BuildImageStream(string imageName)
+        {
             MemoryStream imageStream = new MemoryStream();
 
-            // H7: dispose the source Bitmap deterministically after Save - the PNG bytes
-            // have already been serialised into the MemoryStream, so disposing the bitmap
-            // does not affect the stream content.
+            // Dispose the source Bitmap deterministically after Save - the PNG bytes have
+            // already been serialised into the MemoryStream, so disposing the bitmap does
+            // not affect the stream content.
             using (Bitmap b = LoadImageBitmapByName(imageName))
             {
                 if (b == null)
@@ -1252,28 +1269,11 @@ namespace NoteHighlightAddin
                 b.Save(imageStream, ImageFormat.Png);
             }
 
-            // H7: Bitmap.Save leaves Position at end-of-stream; rewind so callers that
-            // read from the current position (rather than Seek to 0) receive the PNG.
+            // Bitmap.Save leaves Position at end-of-stream; rewind so callers that read from
+            // the current position (rather than Seek to 0) receive the PNG.
             imageStream.Position = 0;
 
             return new CCOMStreamWrapper(imageStream);
-		}
-
-        /// <summary>
-        /// Tiny <see cref="AxHost"/> subclass used purely as a shim to reach the protected
-        /// <see cref="AxHost.GetIPictureDispFromPicture"/> helper - the well-known WinForms idiom
-        /// for converting a managed <see cref="Image"/> into the COM <see cref="stdole.IPictureDisp"/>
-        /// that a per-control <c>getImage</c> ribbon callback must return. Never instantiated as a
-        /// real control; only its one static accessor is used.
-        /// </summary>
-        private sealed class RibbonImageShim : AxHost
-        {
-            private RibbonImageShim() : base(Guid.Empty.ToString()) { }
-
-            public static stdole.IPictureDisp ToPictureDisp(Image image)
-            {
-                return (stdole.IPictureDisp)GetIPictureDispFromPicture(image);
-            }
         }
 
         /// <summary>

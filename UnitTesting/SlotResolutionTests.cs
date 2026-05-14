@@ -301,13 +301,16 @@ namespace UnitTesting
         public void GetSlotImage_UnresolvedSlot_ReturnsNonNullOtherPicture_NeverThrows()
         {
             // Plan section 7.2 test 9: an unresolved slot must yield a non-null
-            // Other.png IPictureDisp and never throw. The AddIn has no pinned
+            // Other.png image stream and never throw. The AddIn has no pinned
             // languages set in a bare test instance, so every slot is unresolved.
             // Per the plan, asserting non-null and exception-free is sufficient -
             // the visual correctness of the picture is covered by manual matrix M7.
+            // GetSlotImage returns a COM IStream (the same mechanism the customUI
+            // loadImage callback uses); the earlier stdole.IPictureDisp route gave
+            // every slot button a blank icon because Office could not bind it.
             var addin = new AddIn();
 
-            stdole.IPictureDisp picture = null;
+            System.Runtime.InteropServices.ComTypes.IStream picture = null;
             try
             {
                 picture = addin.GetSlotImage(new FakeRibbonControl("slotLang00"));
@@ -318,7 +321,7 @@ namespace UnitTesting
             }
 
             Assert.IsNotNull(picture,
-                "GetSlotImage on an unresolved slot must return the Other.png picture, not null.");
+                "GetSlotImage on an unresolved slot must return the Other.png image stream, not null.");
 
             // A null control must also be handled without throwing.
             try
