@@ -211,3 +211,6 @@ project.lock.json
 # Stray test-build artefacts at repo root
 /Microsoft.VisualStudio.QualityTools.UnitTestFramework.dll
 /filter_tests_only.dll
+
+# Local append-only knowledge log (decisions, mistakes, learnings)
+/knowledge.md
