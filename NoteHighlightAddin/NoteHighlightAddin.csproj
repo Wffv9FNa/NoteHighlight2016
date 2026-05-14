@@ -165,22 +165,36 @@
     <Content Include="icon.ico">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
-    <Content Include="Resources\CPP.png" />
-    <Content Include="Resources\CSharp.png" />
-    <Content Include="Resources\CSS.png" />
-    <Content Include="Resources\HTML.png" />
-    <Content Include="Resources\JAVA.png" />
-    <Content Include="Resources\JS.png" />
+    <Content Include="Resources\ahk.png" />
+    <Content Include="Resources\bat.png" />
+    <Content Include="Resources\c.png" />
+    <Content Include="Resources\cs.png" />
+    <Content Include="Resources\css.png" />
+    <Content Include="Resources\dockerfile.png" />
+    <Content Include="Resources\html.png" />
+    <Content Include="Resources\jar.png" />
+    <Content Include="Resources\js.png" />
+    <Content Include="Resources\json.png" />
+    <Content Include="Resources\kt.png" />
     <Content Include="Resources\Logo.ico" />
     <Content Include="Resources\Logo.png" />
+    <Content Include="Resources\lua.png" />
+    <Content Include="Resources\m.png" />
+    <Content Include="Resources\md.png" />
     <Content Include="Resources\Other.png" />
-    <Content Include="Resources\Perl.png" />
-    <Content Include="Resources\PHP.png" />
-    <Content Include="Resources\Python.png" />
-    <Content Include="Resources\Ruby.png" />
-    <Content Include="Resources\SQL.png" />
-    <Content Include="Resources\XHTML.png" />
-    <Content Include="Resources\XML.png" />
+    <Content Include="Resources\php.png" />
+    <Content Include="Resources\pl.png" />
+    <Content Include="Resources\ps1.png" />
+    <Content Include="Resources\py.png" />
+    <Content Include="Resources\rb.png" />
+    <Content Include="Resources\rs.png" />
+    <Content Include="Resources\sh.png" />
+    <Content Include="Resources\sql.png" />
+    <Content Include="Resources\tex.png" />
+    <Content Include="Resources\ts.png" />
+    <Content Include="Resources\vbs.png" />
+    <Content Include="Resources\xml.png" />
+    <Content Include="Resources\yml.png" />
     <None Include="packages.config" />
     <!--
       ribbon.xml is intentionally NOT copied to the build output (and

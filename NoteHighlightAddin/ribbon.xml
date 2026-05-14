@@ -4,35 +4,35 @@
         <tabs>
             <tab id="tabNoteHighlight" label="NoteHighlight" keytip="H">
                 <group id="groupLanguage" label="Language">
-                  <button id="buttonCSharp" label="C#" size="large" screentip="Enter C# Code" onAction="AddInButtonClicked" tag="cs" keytip="C" image="CSharp.png" getVisible="GetLanguageButtonVisible"/>
-                  <button id="buttonSQL" label="SQL" size="large" screentip="Enter SQL Code" onAction="AddInButtonClicked" tag="sql" keytip="S"  image="SQL.png" getVisible="GetLanguageButtonVisible"/>
-                  <button id="buttonCSS" label="CSS" size="large" screentip="Enter CSS Code" onAction="AddInButtonClicked" image="CSS.png" tag="css" keytip="E" getVisible="GetLanguageButtonVisible"/>
-                  <button id="buttonJS" label="JS" size="large" screentip="Enter JS Code" onAction="AddInButtonClicked" tag="js" keytip="J" image="JS.png" getVisible="GetLanguageButtonVisible"/>
-                  <button id="buttonHTML" label="HTML" size="large" screentip="Enter HTML Code" onAction="AddInButtonClicked" tag="html" keytip="H"  image="HTML.png" getVisible="GetLanguageButtonVisible"/>
-                  <button id="buttonXML" label="XML" size="large" screentip="Enter XML Code" onAction="AddInButtonClicked" tag="xml" keytip="X"  image="XML.png" getVisible="GetLanguageButtonVisible"/>
-                  <button id="buttonJAVA" label="JAVA" size="large" screentip="Enter JAVA Code" onAction="AddInButtonClicked" tag="java" keytip="V"  image="JAVA.png" getVisible="GetLanguageButtonVisible"/>
-                  <button id="buttonPHP" label="PHP" size="large" screentip="Enter PHP Code" onAction="AddInButtonClicked" tag="php" keytip="P"  image="PHP.png" getVisible="GetLanguageButtonVisible"/>
-                  <button id="buttonPerl" label="Perl" size="large" screentip="Enter Perl Code" onAction="AddInButtonClicked" tag="perl" keytip="B"  image="Perl.png" getVisible="GetLanguageButtonVisible"/>
-                  <button id="buttonPython" label="Python" size="large" screentip="Enter Python Code" onAction="AddInButtonClicked" tag="py" keytip="A"  image="Python.png" getVisible="GetLanguageButtonVisible"/>
-                  <button id="buttonRuby" label="Ruby" size="large" screentip="Enter Ruby Code" onAction="AddInButtonClicked" tag="ruby" keytip="R"  image="Ruby.png" getVisible="GetLanguageButtonVisible"/>
-                  <button id="buttonCpp" label="CPP" size="large" screentip="Enter C++ Code" onAction="AddInButtonClicked" tag="c" keytip="D"  image="CPP.png" getVisible="GetLanguageButtonVisible"/>
-				  <button id="buttonPowerShell" label="PowerShell" size="large" screentip="Enter PowerShell Code" onAction="AddInButtonClicked" tag="ps1"  image="Other.png" getVisible="GetLanguageButtonVisible"/>
+                  <button id="buttonCSharp" label="C#" size="large" screentip="Enter C# Code" onAction="AddInButtonClicked" tag="cs" keytip="C" image="cs.png" getVisible="GetLanguageButtonVisible"/>
+                  <button id="buttonSQL" label="SQL" size="large" screentip="Enter SQL Code" onAction="AddInButtonClicked" tag="sql" keytip="S"  image="sql.png" getVisible="GetLanguageButtonVisible"/>
+                  <button id="buttonCSS" label="CSS" size="large" screentip="Enter CSS Code" onAction="AddInButtonClicked" image="css.png" tag="css" keytip="E" getVisible="GetLanguageButtonVisible"/>
+                  <button id="buttonJS" label="JS" size="large" screentip="Enter JS Code" onAction="AddInButtonClicked" tag="js" keytip="J" image="js.png" getVisible="GetLanguageButtonVisible"/>
+                  <button id="buttonHTML" label="HTML" size="large" screentip="Enter HTML Code" onAction="AddInButtonClicked" tag="html" keytip="H"  image="html.png" getVisible="GetLanguageButtonVisible"/>
+                  <button id="buttonXML" label="XML" size="large" screentip="Enter XML Code" onAction="AddInButtonClicked" tag="xml" keytip="X"  image="xml.png" getVisible="GetLanguageButtonVisible"/>
+                  <button id="buttonJAVA" label="JAVA" size="large" screentip="Enter JAVA Code" onAction="AddInButtonClicked" tag="java" keytip="V"  image="jar.png" getVisible="GetLanguageButtonVisible"/>
+                  <button id="buttonPHP" label="PHP" size="large" screentip="Enter PHP Code" onAction="AddInButtonClicked" tag="php" keytip="P"  image="php.png" getVisible="GetLanguageButtonVisible"/>
+                  <button id="buttonPerl" label="Perl" size="large" screentip="Enter Perl Code" onAction="AddInButtonClicked" tag="perl" keytip="B"  image="pl.png" getVisible="GetLanguageButtonVisible"/>
+                  <button id="buttonPython" label="Python" size="large" screentip="Enter Python Code" onAction="AddInButtonClicked" tag="py" keytip="A"  image="py.png" getVisible="GetLanguageButtonVisible"/>
+                  <button id="buttonRuby" label="Ruby" size="large" screentip="Enter Ruby Code" onAction="AddInButtonClicked" tag="ruby" keytip="R"  image="rb.png" getVisible="GetLanguageButtonVisible"/>
+                  <button id="buttonCpp" label="CPP" size="large" screentip="Enter C++ Code" onAction="AddInButtonClicked" tag="c" keytip="D"  image="c.png" getVisible="GetLanguageButtonVisible"/>
+				  <button id="buttonPowerShell" label="PowerShell" size="large" screentip="Enter PowerShell Code" onAction="AddInButtonClicked" tag="ps1"  image="ps1.png" getVisible="GetLanguageButtonVisible"/>
 
-                  <button id="buttonDOSBatch" label="DOS Batch" size="large" screentip="Enter DOS Batch Code" onAction="AddInButtonClicked" tag="bat"  image="Other.png" getVisible="GetLanguageButtonVisible"/>
-                  <button id="buttonJSON" label="JSON" size="large" screentip="Enter JSON Code" onAction="AddInButtonClicked" tag="json"  image="Other.png" getVisible="GetLanguageButtonVisible"/>
-                  <button id="buttonLua" label="Lua" size="large" screentip="Enter Lua Code" onAction="AddInButtonClicked" tag="lua"  image="Other.png" getVisible="GetLanguageButtonVisible"/>
-                  <button id="buttonMarkdown" label="Markdown" size="large" screentip="Enter Markdown Code" onAction="AddInButtonClicked" tag="md"  image="Other.png" getVisible="GetLanguageButtonVisible"/>
-                  <button id="buttonMSSQL" label="MSSQL" size="large" screentip="Enter MSSQL Code" onAction="AddInButtonClicked" tag="mssql"  image="SQL.png" getVisible="GetLanguageButtonVisible"/>
-                  <button id="buttonObjectiveC" label="Objective C" size="large" screentip="Enter Objective C Code" onAction="AddInButtonClicked" tag="objc"  image="CPP.png" getVisible="GetLanguageButtonVisible"/>
-                  <button id="buttonBash" label="Bash" size="large" screentip="Enter Bash Code" onAction="AddInButtonClicked" tag="sh"  image="Other.png" getVisible="GetLanguageButtonVisible"/>
-                  <button id="buttonVisualBasic" label="Visual Basic" size="large" screentip="Enter Visual Basic Code" onAction="AddInButtonClicked" tag="vb"  image="Other.png" getVisible="GetLanguageButtonVisible"/>
-				  <button id="buttonTypeScript" label="TypeScript" size="large" screentip="Enter Type Script Code" onAction="AddInButtonClicked" tag="ts"  image="Other.png" getVisible="GetLanguageButtonVisible"/>
-                  <button id="buttonAutoHotkey" label="AutoHotkey" size="large" screentip="Enter AutoHotkey Code" onAction="AddInButtonClicked" tag="autohotkey"  image="Other.png" getVisible="GetLanguageButtonVisible"/>
-                  <button id="buttonDockerfile" label="Dockerfile" size="large" screentip="Enter Dockerfile Code" onAction="AddInButtonClicked" tag="dockerfile"  image="Other.png" getVisible="GetLanguageButtonVisible"/>
-                  <button id="buttonKotlin" label="Kotlin" size="large" screentip="Enter Kotlin Code" onAction="AddInButtonClicked" tag="kotlin"  image="Other.png" getVisible="GetLanguageButtonVisible"/>
-                  <button id="buttonLaTeX" label="LaTeX" size="large" screentip="Enter LaTeX Code" onAction="AddInButtonClicked" tag="tex"  image="Other.png" getVisible="GetLanguageButtonVisible"/>
-                  <button id="buttonRust" label="Rust" size="large" screentip="Enter Rust Code" onAction="AddInButtonClicked" tag="rust"  image="Other.png" getVisible="GetLanguageButtonVisible"/>
-                  <button id="buttonYAML" label="YAML" size="large" screentip="Enter YAML Code" onAction="AddInButtonClicked" tag="yaml"  image="Other.png" getVisible="GetLanguageButtonVisible"/>
+                  <button id="buttonDOSBatch" label="DOS Batch" size="large" screentip="Enter DOS Batch Code" onAction="AddInButtonClicked" tag="bat"  image="bat.png" getVisible="GetLanguageButtonVisible"/>
+                  <button id="buttonJSON" label="JSON" size="large" screentip="Enter JSON Code" onAction="AddInButtonClicked" tag="json"  image="json.png" getVisible="GetLanguageButtonVisible"/>
+                  <button id="buttonLua" label="Lua" size="large" screentip="Enter Lua Code" onAction="AddInButtonClicked" tag="lua"  image="lua.png" getVisible="GetLanguageButtonVisible"/>
+                  <button id="buttonMarkdown" label="Markdown" size="large" screentip="Enter Markdown Code" onAction="AddInButtonClicked" tag="md"  image="md.png" getVisible="GetLanguageButtonVisible"/>
+                  <button id="buttonMSSQL" label="MSSQL" size="large" screentip="Enter MSSQL Code" onAction="AddInButtonClicked" tag="mssql"  image="sql.png" getVisible="GetLanguageButtonVisible"/>
+                  <button id="buttonObjectiveC" label="Objective C" size="large" screentip="Enter Objective C Code" onAction="AddInButtonClicked" tag="objc"  image="m.png" getVisible="GetLanguageButtonVisible"/>
+                  <button id="buttonBash" label="Bash" size="large" screentip="Enter Bash Code" onAction="AddInButtonClicked" tag="sh"  image="sh.png" getVisible="GetLanguageButtonVisible"/>
+                  <button id="buttonVisualBasic" label="Visual Basic" size="large" screentip="Enter Visual Basic Code" onAction="AddInButtonClicked" tag="vb"  image="vbs.png" getVisible="GetLanguageButtonVisible"/>
+				  <button id="buttonTypeScript" label="TypeScript" size="large" screentip="Enter Type Script Code" onAction="AddInButtonClicked" tag="ts"  image="ts.png" getVisible="GetLanguageButtonVisible"/>
+                  <button id="buttonAutoHotkey" label="AutoHotkey" size="large" screentip="Enter AutoHotkey Code" onAction="AddInButtonClicked" tag="autohotkey"  image="ahk.png" getVisible="GetLanguageButtonVisible"/>
+                  <button id="buttonDockerfile" label="Dockerfile" size="large" screentip="Enter Dockerfile Code" onAction="AddInButtonClicked" tag="dockerfile"  image="dockerfile.png" getVisible="GetLanguageButtonVisible"/>
+                  <button id="buttonKotlin" label="Kotlin" size="large" screentip="Enter Kotlin Code" onAction="AddInButtonClicked" tag="kotlin"  image="kt.png" getVisible="GetLanguageButtonVisible"/>
+                  <button id="buttonLaTeX" label="LaTeX" size="large" screentip="Enter LaTeX Code" onAction="AddInButtonClicked" tag="tex"  image="tex.png" getVisible="GetLanguageButtonVisible"/>
+                  <button id="buttonRust" label="Rust" size="large" screentip="Enter Rust Code" onAction="AddInButtonClicked" tag="rust"  image="rs.png" getVisible="GetLanguageButtonVisible"/>
+                  <button id="buttonYAML" label="YAML" size="large" screentip="Enter YAML Code" onAction="AddInButtonClicked" tag="yaml"  image="yml.png" getVisible="GetLanguageButtonVisible"/>
                   <dynamicMenu id="menuMoreLanguages"
                                label="More languages..."
                                size="large"
