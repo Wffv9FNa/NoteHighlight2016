@@ -39,7 +39,38 @@
     <Reference Include="System.Configuration" />
     <Reference Include="System.Drawing" />
     <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xml" />
     <Reference Include="System.Xml.Linq" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Office interop, embedded as type-equivalent interop types. SlotResolutionTests
+         needs Microsoft.Office.Core.IRibbonControl to exercise the slot ribbon
+         callbacks (e.g. GetSlotImage). EmbedInteropTypes=True keeps this in step
+         with NoteHighlightAddin, where the same COMReference is also embedded -
+         the two embedded copies of IRibbonControl are unified by COM type
+         equivalence so a test stub crosses the assembly boundary cleanly. -->
+    <COMReference Include="Microsoft.Office.Core">
+      <Guid>{2DF8D04C-5BFA-101B-BDE5-00AA0044DE52}</Guid>
+      <VersionMajor>2</VersionMajor>
+      <VersionMinor>8</VersionMinor>
+      <Lcid>0</Lcid>
+      <WrapperTool>tlbimp</WrapperTool>
+      <Isolated>False</Isolated>
+      <EmbedInteropTypes>True</EmbedInteropTypes>
+    </COMReference>
+    <!-- OLE Automation type library (stdole2.tlb) - the return type of the
+         per-control getImage callback AddIn.GetSlotImage is stdole.IPictureDisp.
+         Embedded so SlotResolutionTests can name that return type; mirrors the
+         identical COMReference in NoteHighlightAddin. -->
+    <COMReference Include="stdole">
+      <Guid>{00020430-0000-0000-C000-000000000046}</Guid>
+      <VersionMajor>2</VersionMajor>
+      <VersionMinor>0</VersionMinor>
+      <Lcid>0</Lcid>
+      <WrapperTool>primary</WrapperTool>
+      <Isolated>False</Isolated>
+      <EmbedInteropTypes>True</EmbedInteropTypes>
+    </COMReference>
   </ItemGroup>
   <Choose>
     <When Condition="('$(VisualStudioVersion)' == '10.0' or '$(VisualStudioVersion)' == '') and '$(TargetFrameworkVersion)' == 'v3.5'">
@@ -65,6 +96,7 @@
     <Compile Include="LanguageSettingsTests.cs" />
     <Compile Include="UnitTesting.cs" />
     <Compile Include="PreviewHtmlWrapperTests.cs" />
+    <Compile Include="SlotResolutionTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
