@@ -10,8 +10,10 @@
                     against LanguageSettings.Pinned[slotIndex], so pinned languages
                     render in the user's chosen order.
 
-                    N = 14 slots. This count is COUPLED to LanguageSettingsForm.MaxPinned -
-                    if one changes the other must change too (locked by a unit test).
+                    N = 14 slots. This count is COUPLED to the MaxPinned constant in
+                    LanguageSettingsForm.cs - if one changes the other must change too.
+                    The coupling is locked by the unit test
+                    Ribbon_GroupLanguage_HasExactlyMaxPinnedSlotButtons.
 
                     Keytips are static and positional (slot 0 -> "1" .. slot 8 -> "9",
                     slot 9 -> "0", slots 10-13 -> "F", "G", "K", "N"). The four letters

@@ -27,6 +27,11 @@ namespace NoteHighlightAddin
     /// </summary>
     public partial class LanguageSettingsForm : Form
     {
+        // Maximum number of languages the user may pin. This is COUPLED to the slot
+        // button count in ribbon.xml: groupLanguage declares exactly this many
+        // slotLangNN buttons (slotLang00..slotLang13). Changing one REQUIRES changing
+        // the other - the coupling is locked by the unit test
+        // Ribbon_GroupLanguage_HasExactlyMaxPinnedSlotButtons.
         public const int MaxPinned = 14;
 
         private readonly AddIn _addin;
