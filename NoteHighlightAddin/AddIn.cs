@@ -300,8 +300,8 @@ namespace NoteHighlightAddin
 			catch (Exception ex)
 			{
 				System.Diagnostics.Trace.TraceError("NoteHighlight2016: LanguageSettings.LoadOrSeed threw; ribbon will use fallback defaults. " + ex);
-				// Fall back to an in-memory defaults instance so GetLanguageButtonVisible
-				// still has something to consult.
+				// Fall back to an in-memory defaults instance so the slot get* callbacks
+				// still have something to consult.
 				try
 				{
 					var fallback = LanguageSettings.LoadOrSeed(null, null, LanguageRegistry.DefaultPinned);
@@ -512,31 +512,186 @@ namespace NoteHighlightAddin
         }
 
         /// <summary>
-        /// <c>getVisible</c> for every language button in the Language group(s) of ribbon.xml.
-        /// Pure dictionary lookup against the cached <see cref="LanguageSettings"/>; deliberately
-        /// does NOT call <c>_ribbon.Invalidate()</c> (re-entrant invalidate from inside a get*
-        /// callback is a documented no-op / stall - see plan section 6 and Phase 0 findings).
+        /// Parse a slot button id of the form <c>slotLangNN</c> into its integer index.
+        /// Returns -1 on any malformed id (null, wrong prefix, non-numeric suffix).
         /// </summary>
-        [System.CLSCompliant(false)]
-        public bool GetLanguageButtonVisible(IRibbonControl control)
+        internal static int SlotIndexFromControlId(string controlId)
         {
-            if (control == null) return false;
+            const string prefix = "slotLang";
+            if (string.IsNullOrEmpty(controlId)) return -1;
+            if (!controlId.StartsWith(prefix, StringComparison.Ordinal)) return -1;
+            string suffix = controlId.Substring(prefix.Length);
+            if (suffix.Length == 0) return -1;
+            if (!int.TryParse(suffix, NumberStyles.None, CultureInfo.InvariantCulture, out int idx))
+                return -1;
+            return idx;
+        }
+
+        /// <summary>
+        /// Resolve a slot index to the pinned <see cref="LanguageDescriptor"/>, or <c>null</c> if
+        /// the slot is beyond the current pinned count or the pinned tag is not in the registry.
+        ///
+        /// <para>
+        /// Thread-safety invariant (reviewer m1): reading <c>snap.Pinned</c> lock-free after the
+        /// snapshot is only safe because the live <see cref="LanguageSettings"/> instance handed
+        /// to the AddIn is never mutated in place - <see cref="LanguageSettingsForm"/> edits a
+        /// clone and <see cref="ReplaceLanguageSettings"/> swaps the whole <c>_languages</c>
+        /// reference under <see cref="_languagesLock"/>. <see cref="LanguageSettings"/> does
+        /// expose mutators (Pin/Unpin/Reorder), so this invariant is load-bearing: a future change
+        /// to the form's save path that mutated the live instance would quietly break it.
+        /// </para>
+        /// </summary>
+        private LanguageDescriptor ResolveSlot(int slotIndex)
+        {
             LanguageSettings snap;
             lock (_languagesLock) { snap = _languages; }
-            if (snap == null)
+            return ResolveSlot(snap, LanguageRegistry.All, slotIndex);
+        }
+
+        /// <summary>
+        /// Pure / static core of <see cref="ResolveSlot(int)"/>. Exposed so unit tests can exercise
+        /// the slot-index-to-descriptor mapping with a hand-built descriptor list, without standing
+        /// up the static <see cref="LanguageRegistry"/> (mirrors how <see cref="BuildMoreLanguagesMenuXml"/>
+        /// was made static / testable). Returns <c>null</c> when <paramref name="settings"/> is null,
+        /// the index is out of range, or the pinned tag is not present in <paramref name="registry"/>.
+        /// </summary>
+        internal static LanguageDescriptor ResolveSlot(LanguageSettings settings,
+                                                       IReadOnlyList<LanguageDescriptor> registry,
+                                                       int slotIndex)
+        {
+            if (settings == null) return null;
+            var pinned = settings.Pinned;                 // ordered
+            if (pinned == null) return null;
+            if (slotIndex < 0 || slotIndex >= pinned.Count) return null;
+            string tag = pinned[slotIndex];
+            if (string.IsNullOrEmpty(tag) || registry == null) return null;
+            foreach (var d in registry)
             {
-                // Pre-OnConnection or load failure - keep the button visible so the user
-                // can still use the add-in if registry init failed for any reason.
-                // (Matches the "fall back to a visible ribbon" intent of section 4.3.)
-                return true;
+                if (d != null && string.Equals(d.Tag, tag, StringComparison.Ordinal))
+                    return d;
             }
-            return snap.IsVisibleAsPinnedButton(control.Tag);
+            return null;   // catalogue miss
+        }
+
+        /// <summary>
+        /// <c>getVisible</c> for a <c>slotLangNN</c> pinned-language slot button. A slot is visible
+        /// iff there is a pinned language at that index and it resolves in the catalogue. Pure
+        /// snapshot read (plus one locked registry lookup); deliberately does NOT call
+        /// <c>_ribbon.Invalidate()</c> - re-entrant invalidate from inside a get* callback is a
+        /// documented no-op / stall (see plan section 4 and Phase 0 findings). Never throws out of
+        /// Office: on exception it logs and returns <c>false</c> (hidden).
+        /// </summary>
+        [System.CLSCompliant(false)]
+        public bool GetSlotVisible(IRibbonControl control)
+        {
+            try
+            {
+                if (control == null) return false;
+                int idx = SlotIndexFromControlId(control.Id);
+                return ResolveSlot(idx) != null;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.TraceWarning("NoteHighlight2016: GetSlotVisible threw; hiding slot. " + ex);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// <c>getLabel</c> for a <c>slotLangNN</c> slot button. Returns the resolved descriptor's
+        /// label, falling back to its tag, then to <see cref="string.Empty"/> - never <c>null</c>.
+        /// Pure snapshot read; does NOT self-invalidate. Never throws out of Office.
+        /// </summary>
+        [System.CLSCompliant(false)]
+        public string GetSlotLabel(IRibbonControl control)
+        {
+            try
+            {
+                if (control == null) return string.Empty;
+                int idx = SlotIndexFromControlId(control.Id);
+                var desc = ResolveSlot(idx);
+                if (desc == null) return string.Empty;
+                return desc.Label ?? desc.Tag ?? string.Empty;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.TraceWarning("NoteHighlight2016: GetSlotLabel threw; returning empty label. " + ex);
+                return string.Empty;
+            }
+        }
+
+        /// <summary>
+        /// <c>getImage</c> for a <c>slotLangNN</c> slot button. Per-control <c>getImage</c> returns
+        /// <see cref="stdole.IPictureDisp"/> (NOT <c>IStream</c> - that is the <c>loadImage</c>
+        /// contract, see <see cref="GetImage(string)"/>). Resolves the slot to a descriptor, loads
+        /// the named bitmap from <c>Properties.Resources</c> and converts it to an
+        /// <see cref="stdole.IPictureDisp"/>. On an unresolved slot (or any exception) it returns
+        /// the <c>Other.png</c> picture so a slot never shows a broken-icon glyph in the brief
+        /// window between an invalidate and re-collection. Does NOT self-invalidate.
+        /// </summary>
+        [System.CLSCompliant(false)]
+        public stdole.IPictureDisp GetSlotImage(IRibbonControl control)
+        {
+            try
+            {
+                string imageName = "Other.png";
+                if (control != null)
+                {
+                    int idx = SlotIndexFromControlId(control.Id);
+                    var desc = ResolveSlot(idx);
+                    if (desc != null && !string.IsNullOrEmpty(desc.Image))
+                        imageName = desc.Image;
+                }
+
+                Bitmap bmp = LoadImageBitmapByName(imageName) ?? LoadImageBitmapByName("Other.png");
+                if (bmp == null) return null;
+                return RibbonImageShim.ToPictureDisp(bmp);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.TraceWarning("NoteHighlight2016: GetSlotImage threw; falling back to Other.png. " + ex);
+                try
+                {
+                    Bitmap fallback = LoadImageBitmapByName("Other.png");
+                    return fallback == null ? null : RibbonImageShim.ToPictureDisp(fallback);
+                }
+                catch (Exception ex2)
+                {
+                    System.Diagnostics.Trace.TraceWarning("NoteHighlight2016: GetSlotImage fallback also threw. " + ex2);
+                    return null;
+                }
+            }
+        }
+
+        /// <summary>
+        /// <c>getScreentip</c> for a <c>slotLangNN</c> slot button. Returns the resolved descriptor's
+        /// screentip, or <see cref="string.Empty"/> - never <c>null</c> (reviewer M2: a
+        /// <c>getScreentip</c> callback always runs and has no "omit" path; Office may treat a null
+        /// return as a failed callback). <see cref="string.Empty"/> on both the unresolved path and
+        /// the catch path. Pure snapshot read; does NOT self-invalidate.
+        /// </summary>
+        [System.CLSCompliant(false)]
+        public string GetSlotScreentip(IRibbonControl control)
+        {
+            try
+            {
+                if (control == null) return string.Empty;
+                int idx = SlotIndexFromControlId(control.Id);
+                var desc = ResolveSlot(idx);
+                if (desc == null) return string.Empty;
+                return desc.Screentip ?? string.Empty;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.TraceWarning("NoteHighlight2016: GetSlotScreentip threw; returning empty screentip. " + ex);
+                return string.Empty;
+            }
         }
 
         /// <summary>
         /// <c>getVisible</c> for the <c>menuMoreLanguages</c> dynamic menu. The menu hides
         /// when nothing is "enabled but not pinned" so the ribbon does not show an empty
-        /// dropdown. Like <see cref="GetLanguageButtonVisible"/>, this callback is a pure
+        /// dropdown. Like <see cref="GetSlotVisible"/>, this callback is a pure
         /// snapshot read and must NOT call <c>_ribbon.Invalidate()</c> - Office is mid-
         /// collection of get* values and the call is re-entrant.
         /// </summary>
@@ -764,6 +919,38 @@ namespace NoteHighlightAddin
             }
         }
 
+        /// <summary>
+        /// <c>onAction</c> for a <c>slotLangNN</c> pinned-language slot button. Unlike
+        /// <see cref="AddInButtonClicked"/> - which is still used by the dynamic-menu items and
+        /// maps by <c>control.Tag</c> - slot buttons carry no <c>tag=</c> attribute, so this maps
+        /// by <c>control.Id</c> via <see cref="SlotIndexFromControlId"/> and resolves the tag at
+        /// click time. The resolved <c>desc.Tag</c> (an immutable, apartment-safe managed string)
+        /// is captured BEFORE the cross-apartment Post, exactly as <see cref="AddInButtonClicked"/>
+        /// captures <c>control.Tag</c>.
+        /// </summary>
+        [System.CLSCompliant(false)]
+        public void SlotButtonClicked(IRibbonControl control)
+        {
+            ObservePendingInvalidate();
+            try
+            {
+                int idx = SlotIndexFromControlId(control?.Id);   // map by Id, not Tag
+                var desc = ResolveSlot(idx);
+                if (desc == null)
+                {
+                    System.Diagnostics.Trace.TraceWarning("NoteHighlight2016: slot click on unresolved slot id='"
+                        + (control?.Id ?? "<null>") + "'.");
+                    return;
+                }
+                string clickTag = desc.Tag;          // immutable managed string
+                EnsureMainWorker().Post(() => ShowForm(clickTag));
+            }
+            catch (Exception e)
+            {
+                MessageBox.Show("Exception from SlotButtonClicked: " + e.ToString());
+            }
+        }
+
         private void ShowForm(string tag)
         {
             string outFileName = Guid.NewGuid().ToString();
@@ -974,6 +1161,17 @@ namespace NoteHighlightAddin
         /// and sets <see cref="_invalidatePending"/> so the next ribbon onAction triggers an
         /// IRibbonUI.Invalidate(). DOES NOT touch <see cref="_ribbon"/> directly - the worker has
         /// no apartment-safe handle on Office's ribbon-callback threads.
+        ///
+        /// <para>
+        /// Thread-safety invariant (reviewer m1): this method must SWAP the whole <c>_languages</c>
+        /// reference, never mutate the existing instance in place. <see cref="ResolveSlot(int)"/>
+        /// and the slot get* callbacks read <c>snap.Pinned</c> lock-free after taking a snapshot
+        /// under <see cref="_languagesLock"/>; that is only safe because the live instance is
+        /// immutable once published. <see cref="LanguageSettings"/> does expose mutators
+        /// (Pin/Unpin/Reorder) - a future change here that called one of those on the live
+        /// <c>_languages</c> instead of swapping a freshly built one would quietly break that
+        /// invariant.
+        /// </para>
         /// </summary>
         internal void ReplaceLanguageSettings(LanguageSettings settings)
         {
@@ -986,19 +1184,29 @@ namespace NoteHighlightAddin
         }
 
         /// <summary>
-        /// Specified in Ribbon.xml, this method returns the image to display on the ribbon button
+        /// Reflects over <c>Properties.Resources</c> by name and returns the matching
+        /// <see cref="Bitmap"/>, or <c>null</c> if the resource is missing or is not a Bitmap.
+        /// Shared lookup core for both image callbacks: <see cref="GetImage(string)"/>
+        /// (the <c>loadImage</c> path, wraps the result as <c>IStream</c>) and
+        /// <see cref="GetSlotImage"/> (the per-control <c>getImage</c> path, converts to
+        /// <see cref="stdole.IPictureDisp"/>).
+        ///
+        /// <para>
+        /// Memory rule project_ribbon_icons_load_via_resx_reflection still applies: every image
+        /// referenced by the ribbon needs a ResX &lt;data&gt; entry plus a Designer.cs accessor,
+        /// not merely a csproj &lt;Content&gt; row - the lookup here is reflection over the
+        /// generated <c>Properties.Resources</c> accessors.
+        /// </para>
         /// </summary>
-        /// <param name="imageName"></param>
-        /// <returns></returns>
-        public IStream GetImage(string imageName)
-		{
+        private static Bitmap LoadImageBitmapByName(string imageName)
+        {
+            if (string.IsNullOrEmpty(imageName)) return null;
+
             BindingFlags flags = BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
 
-            // H7: null-guard the reflected resource lookup. If the resource is missing
-            // (e.g. someone added a button referencing an image that was not embedded),
-            // return null so Office falls back to a default icon rather than crashing the
-            // whole ribbon with "An error occurred while creating the ribbon".
-            string propertyName = imageName.Substring(0, imageName.IndexOf('.'));
+            int dot = imageName.IndexOf('.');
+            string propertyName = dot >= 0 ? imageName.Substring(0, dot) : imageName;
+
             PropertyInfo prop = typeof(Properties.Resources).GetProperty(propertyName, flags);
             if (prop == null)
             {
@@ -1006,15 +1214,38 @@ namespace NoteHighlightAddin
                 return null;
             }
 
+            Bitmap b = prop.GetValue(null, null) as Bitmap;
+            if (b == null)
+            {
+                System.Diagnostics.Trace.TraceWarning("NoteHighlight2016: ribbon image resource '" + propertyName + "' is not a Bitmap.");
+                return null;
+            }
+            return b;
+        }
+
+        /// <summary>
+        /// Specified in Ribbon.xml as the root <c>loadImage</c> callback, this method returns the
+        /// image to display on a ribbon button declared with a static <c>image=</c> attribute.
+        /// The <c>loadImage</c> contract returns <c>IStream</c> (contrast <see cref="GetSlotImage"/>,
+        /// the per-control <c>getImage</c> callback, which returns <see cref="stdole.IPictureDisp"/>).
+        /// </summary>
+        /// <param name="imageName"></param>
+        /// <returns></returns>
+        public IStream GetImage(string imageName)
+		{
+            // H7: null-guard the reflected resource lookup. If the resource is missing
+            // (e.g. someone added a button referencing an image that was not embedded),
+            // return null so Office falls back to a default icon rather than crashing the
+            // whole ribbon with "An error occurred while creating the ribbon".
+            MemoryStream imageStream = new MemoryStream();
+
             // H7: dispose the source Bitmap deterministically after Save - the PNG bytes
             // have already been serialised into the MemoryStream, so disposing the bitmap
             // does not affect the stream content.
-            MemoryStream imageStream = new MemoryStream();
-            using (Bitmap b = prop.GetValue(null, null) as Bitmap)
+            using (Bitmap b = LoadImageBitmapByName(imageName))
             {
                 if (b == null)
                 {
-                    System.Diagnostics.Trace.TraceWarning("NoteHighlight2016: ribbon image resource '" + propertyName + "' is not a Bitmap.");
                     imageStream.Dispose();
                     return null;
                 }
@@ -1027,6 +1258,23 @@ namespace NoteHighlightAddin
 
             return new CCOMStreamWrapper(imageStream);
 		}
+
+        /// <summary>
+        /// Tiny <see cref="AxHost"/> subclass used purely as a shim to reach the protected
+        /// <see cref="AxHost.GetIPictureDispFromPicture"/> helper - the well-known WinForms idiom
+        /// for converting a managed <see cref="Image"/> into the COM <see cref="stdole.IPictureDisp"/>
+        /// that a per-control <c>getImage</c> ribbon callback must return. Never instantiated as a
+        /// real control; only its one static accessor is used.
+        /// </summary>
+        private sealed class RibbonImageShim : AxHost
+        {
+            private RibbonImageShim() : base(Guid.Empty.ToString()) { }
+
+            public static stdole.IPictureDisp ToPictureDisp(Image image)
+            {
+                return (stdole.IPictureDisp)GetIPictureDispFromPicture(image);
+            }
+        }
 
         /// <summary>
         /// Insert HighLight Code To Mouse Position.
