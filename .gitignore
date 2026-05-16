@@ -214,3 +214,6 @@ project.lock.json
 
 # Local append-only knowledge log (decisions, mistakes, learnings)
 /knowledge.md
+
+# Claude Code project instructions - local only, not shared
+/CLAUDE.md
