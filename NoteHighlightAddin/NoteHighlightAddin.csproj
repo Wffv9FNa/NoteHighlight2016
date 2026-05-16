@@ -109,6 +109,7 @@
     <Compile Include="LanguageRegistry.cs" />
     <Compile Include="LanguageSettings.cs" />
     <Compile Include="OneNoteMessageFilter.cs" />
+    <Compile Include="PageSelection.cs" />
     <Compile Include="SettingsHelper.cs" />
     <Compile Include="StaWorker.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

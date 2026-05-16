@@ -961,6 +961,7 @@ namespace NoteHighlightAddin
                 XElement outline = null;
                 bool selectedTextFormated = false;
 
+                PageSelection selection = PageSelection.From(null, ns);
                 if (pageNode != null)
                 {
                     string pageXml = GetPageXml(pageNode.Attribute("ID").Value);
@@ -979,11 +980,14 @@ namespace NoteHighlightAddin
                         return;
                     }
 
-                    selectedText = GetSelectedText(pageRoot, out selectedTextFormated);
+                    // Resolve the selection state once and thread it through every helper that
+                    // would otherwise re-traverse the page (resolves review item 2.1).
+                    selection = PageSelection.From(pageRoot, ns);
+                    selectedText = GetSelectedText(selection, out selectedTextFormated);
 
                     if (selectedText.Trim() != "")
                     {
-                        outline = GetOutline(pageRoot);
+                        outline = selection.Outline;
                     }
                 }
 
@@ -1016,7 +1020,7 @@ namespace NoteHighlightAddin
 
                 if (File.Exists(htmlOutputPath))
                 {
-                    InsertHighLightCodeToCurrentSide(htmlOutputPath, pageRoot, form.Parameters, outline, selectedTextFormated);
+                    InsertHighLightCodeToCurrentSide(htmlOutputPath, selection, form.Parameters, outline, selectedTextFormated);
                 }
             }
             catch (Exception e)
@@ -1279,7 +1283,7 @@ namespace NoteHighlightAddin
         /// <summary>
         /// Insert HighLight Code To Mouse Position.
         /// </summary>
-        private void InsertHighLightCodeToCurrentSide(string fileName, XElement pageRoot, HighLightParameter parameters, XElement outline, bool selectedTextFormated)
+        private void InsertHighLightCodeToCurrentSide(string fileName, PageSelection selection, HighLightParameter parameters, XElement outline, bool selectedTextFormated)
         {
             try
             {
@@ -1296,10 +1300,10 @@ namespace NoteHighlightAddin
                     string[] position = null;
                     if (outline == null)
                     {
-                        position = GetMousePointPosition(pageRoot);
+                        position = GetMousePointPosition(selection);
                     }
 
-                    var page = InsertHighLightCode(htmlContent, position, parameters, outline, (new GenerateHighLight(GetAddinDirectory())).Config, selectedTextFormated, IsSelectedTextInline(pageRoot));
+                    var page = InsertHighLightCode(htmlContent, position, parameters, outline, (new GenerateHighLight(GetAddinDirectory())).Config, selectedTextFormated, IsSelectedTextInline(selection));
                     page.Root.SetAttributeValue("ID", existingPageId);
 
                     //Bug fix - remove overflow value for Indents
@@ -1340,14 +1344,13 @@ namespace NoteHighlightAddin
         }
 
         /// <summary>
-        /// Get Mouse Point.
+        /// Get Mouse Point. Consumes the pre-resolved <see cref="PageSelection"/>
+        /// rather than re-traversing the page XML (resolves review item 2.1).
         /// </summary>
-        private string[] GetMousePointPosition(XElement pageRoot)
+        private string[] GetMousePointPosition(PageSelection selection)
         {
-            if (pageRoot == null) return null;
-            var node = pageRoot.Descendants(ns + "Outline")
-                               .Where(n => n.Attribute("selected") != null && n.Attribute("selected").Value == "partial")
-                               .FirstOrDefault();
+            if (selection == null) return null;
+            var node = selection.PartialOutline;
             if (node != null)
             {
                 var attrPos = node.Descendants(ns + "Position").FirstOrDefault();
@@ -1361,15 +1364,6 @@ namespace NoteHighlightAddin
             return null;
         }
 
-        private XElement GetOutline(XElement pageRoot)
-        {
-            if (pageRoot == null) return null;
-            var node = pageRoot.Descendants(ns + "Outline")
-                               .Where(n => n.Attribute("selected") != null && (n.Attribute("selected").Value == "all" || n.Attribute("selected").Value == "partial"))
-                               .FirstOrDefault();
-            return node;
-        }
-
         private string GetPageXml(string pageID)
         {
             string pageXml;
@@ -1378,83 +1372,79 @@ namespace NoteHighlightAddin
             return pageXml;
         }
 
+        /// <summary>
+        /// Test-seam overload kept for backwards compatibility with the
+        /// existing UnitTesting fixtures that pass a raw <c>pageRoot</c>.
+        /// New callers should build a <see cref="PageSelection"/> once via
+        /// <see cref="PageSelection.From"/> and pass that through instead.
+        /// </summary>
         public string GetSelectedText(XElement pageRoot, out bool selectedTextFormated)
+        {
+            return GetSelectedText(PageSelection.From(pageRoot, ns), out selectedTextFormated);
+        }
+
+        internal string GetSelectedText(PageSelection selection, out bool selectedTextFormated)
         {
             selectedTextFormated = false;
             StringBuilder sb = new StringBuilder();
-            if (pageRoot == null) return sb.ToString();
-            var node = pageRoot.Descendants(ns + "Outline")
-                               .Where(n => n.Attribute("selected") != null && (n.Attribute("selected").Value == "all" || n.Attribute("selected").Value == "partial"))
-                               .FirstOrDefault();
+            if (selection == null || selection.Outline == null) return sb.ToString();
 
-            if (node != null)
+            var node = selection.Outline;
+            var table = selection.Table;
+
+            System.Collections.Generic.IEnumerable<XElement> attrPos;
+            if (table == null)
             {
-                var table = node.Descendants(ns + "Table").Where(n => n.Attribute("selected") != null && (n.Attribute("selected").Value == "all" || n.Attribute("selected").Value == "partial")).FirstOrDefault();
+                attrPos = node.Descendants(ns + "T").Where(n => n.Attribute("selected") != null && n.Attribute("selected").Value == "all");
+            }
+            else
+            {
+                attrPos = table.Descendants(ns + "Cell")
+                               .SelectMany(c => c.Descendants(ns + "T"))
+                               .Where(n => n.Attribute("selected")?.Value == "all");
+                selectedTextFormated = true;
+            }
+            int tabCount = 0;
+            int initTabCount = -1;
+            foreach (var line in attrPos)
+            {
+                var htmlDocument = new HtmlAgilityPack.HtmlDocument();
+                htmlDocument.LoadHtml(line.Value);
 
-                System.Collections.Generic.IEnumerable<XElement> attrPos;
-                if (table == null)
+                if (initTabCount == -1)
                 {
-                    attrPos = node.Descendants(ns + "T").Where(n => n.Attribute("selected") != null && n.Attribute("selected").Value == "all");
+                    initTabCount = line.Ancestors().Elements(ns + "T").Count();
                 }
-                else
-                {
-                    attrPos = table.Descendants(ns + "Cell")
-                                   .SelectMany(c => c.Descendants(ns + "T"))
-                                   .Where(n => n.Attribute("selected")?.Value == "all");
-                    selectedTextFormated = true;
-                }
-                int tabCount = 0;
-                int initTabCount = -1;
-                foreach (var line in attrPos)
-                {
-                    var htmlDocument = new HtmlAgilityPack.HtmlDocument();
-                    htmlDocument.LoadHtml(line.Value);
-
-                    if (initTabCount == -1)
-                    {
-                        initTabCount = line.Ancestors().Elements(ns + "T").Count();
-                    }
-                    tabCount = line.Ancestors().Elements(ns + "T").Count() - initTabCount;
+                tabCount = line.Ancestors().Elements(ns + "T").Count() - initTabCount;
 
 
-                    sb.AppendLine(new String('\t', tabCount) + HttpUtility.HtmlDecode(htmlDocument.DocumentNode.InnerText));
-                }
+                sb.AppendLine(new String('\t', tabCount) + HttpUtility.HtmlDecode(htmlDocument.DocumentNode.InnerText));
             }
             return sb.ToString().TrimEnd('\r','\n');
         }
 
+        /// <summary>
+        /// Test-seam overload kept for backwards compatibility with the
+        /// existing UnitTesting fixtures that pass a raw <c>pageRoot</c>.
+        /// </summary>
         public bool IsSelectedTextInline(XElement pageRoot)
         {
-            if (pageRoot == null) return false;
-            var node = pageRoot.Descendants(ns + "Outline")
-                               .Where(n => n.Attribute("selected") != null && (n.Attribute("selected").Value == "all" || n.Attribute("selected").Value == "partial"))
-                               .FirstOrDefault();
+            return IsSelectedTextInline(PageSelection.From(pageRoot, ns));
+        }
 
-            if (node != null)
+        internal bool IsSelectedTextInline(PageSelection selection)
+        {
+            if (selection == null || selection.Outline == null) return false;
+
+            var node = selection.Outline;
+            var table = selection.Table;
+            var scope = table ?? node;
+
+            foreach (var oeNode in scope.Descendants(ns + "OE"))
             {
-                var table = node.Descendants(ns + "Table").Where(n => n.Attribute("selected") != null && (n.Attribute("selected").Value == "all" || n.Attribute("selected").Value == "partial")).FirstOrDefault();
-
-                System.Collections.Generic.IEnumerable<XElement> attrPos;
-                if (table == null)
-                {
-                    foreach (var oeNode in node.Descendants(ns + "OE"))
-                    {
-                        if (oeNode.Descendants(ns + "T").Where(n => n.Attribute("selected") != null && n.Attribute("selected").Value == "all").Count() > 0
-                                        && oeNode.Descendants(ns + "T").Where(n => n.Attribute("selected") == null || n.Attribute("selected").Value == "none").Count() > 0)
-                        {
-                            return true;
-                        }
-                    }
-                }
-                else
-                {
-                    foreach (var oeNode in table.Descendants(ns + "OE"))
-                    {
-                        var allSel = oeNode.Descendants(ns + "T").Any(n => n.Attribute("selected")?.Value == "all");
-                        var unsel  = oeNode.Descendants(ns + "T").Any(n => n.Attribute("selected") == null || n.Attribute("selected").Value == "none");
-                        if (allSel && unsel) return true;
-                    }
-                }
+                var allSel = oeNode.Descendants(ns + "T").Any(n => n.Attribute("selected") != null && n.Attribute("selected").Value == "all");
+                var unsel  = oeNode.Descendants(ns + "T").Any(n => n.Attribute("selected") == null || n.Attribute("selected").Value == "none");
+                if (allSel && unsel) return true;
             }
             return false;
         }
