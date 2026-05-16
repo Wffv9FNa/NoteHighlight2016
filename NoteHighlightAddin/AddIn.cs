@@ -19,7 +19,7 @@ using Application = Microsoft.Office.Interop.OneNote.Application;  // Conflicts 
 using System.Reflection;
 using System.Drawing;
 using Microsoft.Office.Interop.OneNote;
-using NoteHighLightForm;
+using NoteHighlightForm;
 using System.Text;
 using System.Linq;
 using Helper;

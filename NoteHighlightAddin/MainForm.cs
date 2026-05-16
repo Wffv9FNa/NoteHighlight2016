@@ -1,7 +1,7 @@
 ﻿using GenerateHighlightContent;
 using Helper;
 using ICSharpCode.TextEditor.Document;
-using NoteHighLightForm;
+using NoteHighlightForm;
 using NoteHighlightAddin.Preview;
 using System;
 using System.Configuration;
