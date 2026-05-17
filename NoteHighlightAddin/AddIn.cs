@@ -75,6 +75,12 @@ namespace NoteHighlightAddin
         // STA, but the sweep itself dispatches to the thread pool.
         private static int _sweepDone;
 
+        // Guard for AssemblyResolve subscription. OnConnection is normally called
+        // once per AppDomain lifetime, but a defensive flag keeps us from stacking
+        // handlers if the host ever reconnects. Plain bool is fine: OnConnection
+        // runs on the main STA and the flag is only ever set there.
+        private static bool _assemblyResolveSubscribed;
+
         // Language-picker state (Phase 1). _ribbon is captured by OnRibbonLoad and
         // released in OnDisconnection. _languages is the per-user picker state;
         // reads/writes are coordinated by _languagesLock. _invalidatePending is
@@ -132,6 +138,68 @@ namespace NoteHighlightAddin
             }
 
             return string.IsNullOrEmpty(loc) ? null : Path.GetDirectoryName(loc);
+        }
+
+        /// <summary>
+        /// AssemblyResolve handler that locates GenerateHighlightContent.dll next
+        /// to the add-in DLL. Required because, under OneNote COM activation, the
+        /// AppDomain's AppBase is OneNote's Office16 directory rather than the
+        /// add-in's bin folder, so Fusion cannot find sibling DLLs via its normal
+        /// partial-name probe. Returning the loaded assembly from this handler
+        /// grafts it onto the Load context, which is what ConfigurationManager's
+        /// partial-name Type.GetType lookup consults. Eager Assembly.LoadFrom in
+        /// OnConnection does NOT achieve the same thing - LoadFrom-context
+        /// assemblies are invisible to the Load-context partial-name probe.
+        /// MUST NEVER throw: an exception out of AssemblyResolve tears down the
+        /// AppDomain. Always log + return null on failure.
+        /// </summary>
+        private static Assembly ResolveGenerateHighlightContent(object sender, ResolveEventArgs args)
+        {
+            try
+            {
+                if (args == null || string.IsNullOrEmpty(args.Name))
+                    return null;
+
+                // Match both the partial name ("GenerateHighlightContent") and any
+                // strong-name variant ("GenerateHighlightContent, Version=..."). Use
+                // Ordinal because this handler fires for every assembly load.
+                if (!args.Name.StartsWith("GenerateHighlightContent", StringComparison.Ordinal))
+                    return null;
+
+                var addinDir = GetAddinDirectory();
+                if (string.IsNullOrEmpty(addinDir))
+                {
+                    System.Diagnostics.Trace.TraceError("NoteHighlight2016: AssemblyResolve for '" + args.Name + "' failed - GetAddinDirectory() returned null.");
+                    return null;
+                }
+
+                var ghcPath = Path.Combine(addinDir, "GenerateHighlightContent.dll");
+                if (!File.Exists(ghcPath))
+                {
+                    System.Diagnostics.Trace.TraceError("NoteHighlight2016: AssemblyResolve for '" + args.Name + "' failed - file not found at resolved path '" + ghcPath + "'.");
+                    return null;
+                }
+
+                var loaded = Assembly.LoadFrom(ghcPath);
+                System.Diagnostics.Trace.TraceInformation("NoteHighlight2016: AssemblyResolve loaded '" + args.Name + "' from '" + ghcPath + "' (FullName=" + loaded.FullName + ").");
+                return loaded;
+            }
+            catch (Exception ex)
+            {
+                // Defensive catch-all: never let an exception escape AssemblyResolve.
+                string attempted;
+                try
+                {
+                    var addinDir = GetAddinDirectory();
+                    attempted = string.IsNullOrEmpty(addinDir) ? "<null>" : Path.Combine(addinDir, "GenerateHighlightContent.dll");
+                }
+                catch
+                {
+                    attempted = "<path-resolution-failed>";
+                }
+                System.Diagnostics.Trace.TraceError("NoteHighlight2016: AssemblyResolve for '" + (args != null ? args.Name : "<null>") + "' threw (attempted path '" + attempted + "'). " + ex.ToString());
+                return null;
+            }
         }
 
 		/// <summary>
@@ -269,6 +337,21 @@ namespace NoteHighlightAddin
 			// per-user state must not be initialised. Bail before SetOneNoteApplication.
 			if (ConnectMode == ext_ConnectMode.ext_cm_UISetup)
 				return;
+
+			// MUST subscribe before the first ConfigurationManager.GetSection("HighLightSection") call (MainForm.LoadThemes, SettingsForm, PreviewPane, etc). Under COM activation the AppDomain's AppBase is OneNote's Office16 directory, not the add-in's bin folder, so Fusion's partial-name probe (Type.GetType -> Assembly.Load) cannot locate GenerateHighlightContent.dll on its own. Eager Assembly.LoadFrom does NOT fix this because LoadFrom-context assemblies are invisible to the Load-context partial-name lookup; AssemblyResolve is the canonical workaround because the assembly it returns is treated as if Fusion had resolved it itself. Do NOT move config-section access into a type initialiser that runs before OnConnection - that re-introduces the partial-binding regression. See .local/plans/fix-broken-roundtrip-tests.md Option E.
+			try
+			{
+				if (!_assemblyResolveSubscribed)
+				{
+					AppDomain.CurrentDomain.AssemblyResolve += ResolveGenerateHighlightContent;
+					_assemblyResolveSubscribed = true;
+				}
+			}
+			catch (Exception ex)
+			{
+				System.Diagnostics.Trace.TraceError("NoteHighlight2016: failed to subscribe AssemblyResolve handler; ConfigurationManager.GetSection(\"HighLightSection\") will likely fail under COM activation. " + ex);
+				// Never rethrow - COM activation will silently disable the add-in.
+			}
 
 			SetOneNoteApplication((Application)Application);
 
