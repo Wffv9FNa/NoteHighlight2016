@@ -34,6 +34,7 @@
             this.cbx_style = new System.Windows.Forms.ComboBox();
             this.cbx_Clipboard = new System.Windows.Forms.CheckBox();
             this.cbx_lineNumber = new System.Windows.Forms.CheckBox();
+            this.cbx_tableBorder = new System.Windows.Forms.CheckBox();
             this.txtCode = new ICSharpCode.TextEditor.TextEditorControl();
             this.folderBrowserDialog1 = new System.Windows.Forms.FolderBrowserDialog();
             this.panel1 = new System.Windows.Forms.Panel();
@@ -116,7 +117,17 @@
             this.cbx_lineNumber.TabIndex = 2;
             this.cbx_lineNumber.Text = "Line Number(&N)";
             this.cbx_lineNumber.UseVisualStyleBackColor = true;
-            // 
+            //
+            // cbx_tableBorder
+            //
+            this.cbx_tableBorder.AutoSize = true;
+            this.cbx_tableBorder.Location = new System.Drawing.Point(271, 44);
+            this.cbx_tableBorder.Name = "cbx_tableBorder";
+            this.cbx_tableBorder.Size = new System.Drawing.Size(120, 17);
+            this.cbx_tableBorder.TabIndex = 3;
+            this.cbx_tableBorder.Text = "Show Table Border(&B)";
+            this.cbx_tableBorder.UseVisualStyleBackColor = true;
+            //
             // txtCode
             // 
             this.txtCode.AutoScroll = true;
@@ -129,6 +140,7 @@
             // 
             // panel1
             // 
+            this.panel1.Controls.Add(this.cbx_tableBorder);
             this.panel1.Controls.Add(this.cbx_lineNumber);
             this.panel1.Controls.Add(this.cbx_Clipboard);
             this.panel1.Controls.Add(this.cbx_style);
@@ -136,7 +148,7 @@
             this.panel1.Dock = System.Windows.Forms.DockStyle.Top;
             this.panel1.Location = new System.Drawing.Point(0, 0);
             this.panel1.Name = "panel1";
-            this.panel1.Size = new System.Drawing.Size(517, 53);
+            this.panel1.Size = new System.Drawing.Size(517, 75);
             this.panel1.TabIndex = 1;
             // 
             // panel2
@@ -267,6 +279,7 @@
 
         private System.Windows.Forms.Button btnCodeHighLight;
         private System.Windows.Forms.CheckBox cbx_lineNumber;
+        private System.Windows.Forms.CheckBox cbx_tableBorder;
         private System.Windows.Forms.Label label1;
         private System.Windows.Forms.CheckBox cbx_Clipboard;
         private System.Windows.Forms.FolderBrowserDialog folderBrowserDialog1;

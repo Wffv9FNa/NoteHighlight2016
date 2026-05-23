@@ -187,7 +187,7 @@ namespace NoteHighlightAddin.Preview
                     try { File.Delete(outputPath); } catch { }
                     try { File.Delete(scratchPath); } catch { }
 
-                    wrapped = PreviewHtmlWrapper.Wrap(rawHtml, darkMode, BackColor);
+                    wrapped = PreviewHtmlWrapper.Wrap(rawHtml, darkMode, snapshot.HighlightColor, snapshot.ShowTableBorder);
                 }
                 catch (OperationCanceledException)
                 {

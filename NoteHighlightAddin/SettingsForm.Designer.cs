@@ -30,7 +30,6 @@ namespace NoteHighlightAddin
         {
             this.fontDialog1 = new System.Windows.Forms.FontDialog();
             this.btnFont = new System.Windows.Forms.Button();
-            this.cbShowTableBorder = new System.Windows.Forms.CheckBox();
             this.btnTogglePreview = new System.Windows.Forms.Button();
             this.splitContainer = new System.Windows.Forms.SplitContainer();
             this._previewPane = new NoteHighlightAddin.Preview.PreviewPane();
@@ -58,21 +57,10 @@ namespace NoteHighlightAddin
             this.btnFont.UseVisualStyleBackColor = true;
             this.btnFont.Click += new System.EventHandler(this.BtnFont_Click);
             //
-            // cbShowTableBorder
-            //
-            this.cbShowTableBorder.AutoSize = true;
-            this.cbShowTableBorder.Location = new System.Drawing.Point(34, 70);
-            this.cbShowTableBorder.Name = "cbShowTableBorder";
-            this.cbShowTableBorder.Size = new System.Drawing.Size(117, 17);
-            this.cbShowTableBorder.TabIndex = 2;
-            this.cbShowTableBorder.Text = "Show Table Border";
-            this.cbShowTableBorder.UseVisualStyleBackColor = true;
-            this.cbShowTableBorder.CheckedChanged += new System.EventHandler(this.ChShowTableBorder_CheckedChanged);
-            //
             // btnTogglePreview
             //
             this.btnTogglePreview.AccessibleName = "Toggle preview pane";
-            this.btnTogglePreview.Location = new System.Drawing.Point(34, 110);
+            this.btnTogglePreview.Location = new System.Drawing.Point(34, 70);
             this.btnTogglePreview.Name = "btnTogglePreview";
             this.btnTogglePreview.Size = new System.Drawing.Size(120, 25);
             this.btnTogglePreview.TabIndex = 3;
@@ -90,7 +78,6 @@ namespace NoteHighlightAddin
             // splitContainer.Panel1
             //
             this.splitContainer.Panel1.Controls.Add(this.btnTogglePreview);
-            this.splitContainer.Panel1.Controls.Add(this.cbShowTableBorder);
             this.splitContainer.Panel1.Controls.Add(this.btnFont);
             this.splitContainer.Panel1MinSize = 200;
             this.splitContainer.Panel1.TabIndex = 0;
@@ -135,7 +122,6 @@ namespace NoteHighlightAddin
 
         private System.Windows.Forms.FontDialog fontDialog1;
         private System.Windows.Forms.Button btnFont;
-        private System.Windows.Forms.CheckBox cbShowTableBorder;
         private System.Windows.Forms.Button btnTogglePreview;
         private System.Windows.Forms.SplitContainer splitContainer;
         private NoteHighlightAddin.Preview.PreviewPane _previewPane;

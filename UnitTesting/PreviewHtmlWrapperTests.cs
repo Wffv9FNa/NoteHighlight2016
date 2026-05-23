@@ -1,4 +1,5 @@
 using System;
+using System.Drawing;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NoteHighlightAddin.Preview;
 
@@ -10,7 +11,7 @@ namespace UnitTesting
         [TestMethod]
         public void Wrap_OutputContainsIEEdgeMetaTag()
         {
-            string output = PreviewHtmlWrapper.Wrap("<html><body><pre>hi</pre></body></html>", false, null);
+            string output = PreviewHtmlWrapper.Wrap("<html><body><pre>hi</pre></body></html>", false, null, false);
 
             Assert.IsTrue(
                 output.IndexOf("<meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">", StringComparison.Ordinal) >= 0,
@@ -22,7 +23,7 @@ namespace UnitTesting
         {
             string input = "<pre style=\"background-color:#fff; color:#000;\">code</pre>";
 
-            string output = PreviewHtmlWrapper.Wrap(input, true, null);
+            string output = PreviewHtmlWrapper.Wrap(input, true, null, false);
 
             Assert.IsFalse(
                 output.IndexOf("background-color", StringComparison.Ordinal) >= 0,
@@ -34,11 +35,51 @@ namespace UnitTesting
         {
             string input = "<pre style=\"background-color:#fff; color:#000;\">code</pre>";
 
-            string output = PreviewHtmlWrapper.Wrap(input, false, null);
+            string output = PreviewHtmlWrapper.Wrap(input, false, null, false);
 
             Assert.IsTrue(
                 output.IndexOf("background-color", StringComparison.Ordinal) >= 0,
                 "Light mode must preserve background-color on the <pre> tag.");
+        }
+
+        [TestMethod]
+        public void Wrap_OpaqueBoxColour_AppliedAsWrapperBackground()
+        {
+            // Mirrors the OneNote cell shadingColor: an opaque box colour must
+            // surface as a #RRGGBB background on the preview wrapper.
+            string output = PreviewHtmlWrapper.Wrap(
+                "<pre>code</pre>", false, Color.FromArgb(255, 0x33, 0x66, 0x99), false);
+
+            Assert.IsTrue(
+                output.IndexOf("background:#336699", StringComparison.Ordinal) >= 0,
+                "An opaque box colour must be emitted as a #RRGGBB wrapper background.");
+        }
+
+        [TestMethod]
+        public void Wrap_TransparentBoxColour_EmitsNoBackground()
+        {
+            // Alpha 0 is the OneNote "none" case: no shading, so the wrapper
+            // must not carry any background declaration.
+            string output = PreviewHtmlWrapper.Wrap(
+                "<pre>code</pre>", false, Color.FromArgb(0, 0xFF, 0xFF, 0xFF), false);
+
+            Assert.IsFalse(
+                output.IndexOf("background:", StringComparison.Ordinal) >= 0,
+                "A transparent (alpha 0) box colour must emit no wrapper background.");
+        }
+
+        [TestMethod]
+        public void Wrap_ShowTableBorder_TogglesBorderDeclaration()
+        {
+            string withBorder = PreviewHtmlWrapper.Wrap("<pre>code</pre>", false, null, true);
+            string withoutBorder = PreviewHtmlWrapper.Wrap("<pre>code</pre>", false, null, false);
+
+            Assert.IsTrue(
+                withBorder.IndexOf("border:1px solid", StringComparison.Ordinal) >= 0,
+                "showTableBorder=true must emit a border declaration on the wrapper.");
+            Assert.IsFalse(
+                withoutBorder.IndexOf("border:1px solid", StringComparison.Ordinal) >= 0,
+                "showTableBorder=false must not emit a border declaration.");
         }
 
         [TestMethod]
@@ -53,7 +94,7 @@ namespace UnitTesting
         {
             string input = "<?xml version=\"1.0\" encoding=\"utf-8\"?><html><body><pre>hi</pre></body></html>";
 
-            string output = PreviewHtmlWrapper.Wrap(input, false, null);
+            string output = PreviewHtmlWrapper.Wrap(input, false, null, false);
 
             Assert.IsFalse(
                 output.IndexOf("<?xml", StringComparison.Ordinal) >= 0,

@@ -74,6 +74,7 @@ namespace NoteHighlightAddin
             this.txtCode.TextChanged += (s, e) => SchedulePreview();
             this.cbx_style.SelectedIndexChanged += (s, e) => SchedulePreview();
             this.cbx_lineNumber.CheckedChanged += (s, e) => SchedulePreview();
+            this.cbx_tableBorder.CheckedChanged += (s, e) => SchedulePreview();
             this.btnBackground.BackColorChanged += (s, e) => SchedulePreview();
 
             this.splitContainer.SplitterMoved += SplitContainer_SplitterMoved;
@@ -145,6 +146,7 @@ namespace NoteHighlightAddin
                 HighLightStyle = CodeStyle,
                 ShowLineNumber = IsShowLineNumber,
                 HighlightColor = BackgroundColor,
+                ShowTableBorder = this.cbx_tableBorder.Checked,
                 Font = NoteHighlightForm.Properties.Settings.Default.Font,
                 FontSize = NoteHighlightForm.Properties.Settings.Default.FontSize
             };
@@ -198,6 +200,7 @@ namespace NoteHighlightAddin
             this.btnBackground.BackColor = NoteHighlightForm.Properties.Settings.Default.BackgroundColor;
             this.cbx_Clipboard.Checked = NoteHighlightForm.Properties.Settings.Default.SaveOnClipboard;
             this.cbx_lineNumber.Checked = NoteHighlightForm.Properties.Settings.Default.ShowLineNumber;
+            this.cbx_tableBorder.Checked = NoteHighlightForm.Properties.Settings.Default.ShowTableBorder;
         }
 
         /// <summary>
@@ -377,6 +380,7 @@ namespace NoteHighlightAddin
             var defaultSettings = NoteHighlightForm.Properties.Settings.Default;
             defaultSettings.ShowLineNumber = this.cbx_lineNumber.Checked;
             defaultSettings.SaveOnClipboard = this.cbx_Clipboard.Checked;
+            defaultSettings.ShowTableBorder = this.cbx_tableBorder.Checked;
             defaultSettings.HighLightStyle = this.cbx_style.SelectedIndex;
             defaultSettings.BackgroundColor = this.btnBackground.BackColor;
             SettingsHelper.SafeSave();

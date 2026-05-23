@@ -47,7 +47,6 @@ public static class FibDemo
             fontDialog1.Font = new Font(NoteHighlightForm.Properties.Settings.Default.Font, NoteHighlightForm.Properties.Settings.Default.FontSize);
             btnFont.Text = "Font:" + fontDialog1.Font.Name + ", Size:" + fontDialog1.Font.Size;
             btnFont.Font = fontDialog1.Font;
-            cbShowTableBorder.Checked = NoteHighlightForm.Properties.Settings.Default.ShowTableBorder;
 
             this.splitContainer.SplitterMoved += SplitContainer_SplitterMoved;
         }
@@ -120,14 +119,6 @@ public static class FibDemo
 
         }
 
-        private void ChShowTableBorder_CheckedChanged(object sender, EventArgs e)
-        {
-            NoteHighlightForm.Properties.Settings.Default.ShowTableBorder = cbShowTableBorder.Checked;
-
-            SettingsHelper.SafeSave();
-            SchedulePreview();
-        }
-
         private void SchedulePreview()
         {
             if (_previewPane == null) return;
@@ -141,6 +132,7 @@ public static class FibDemo
                 HighLightStyle = ResolveThemeName(defaults.HighLightStyle),
                 ShowLineNumber = defaults.ShowLineNumber,
                 HighlightColor = defaults.BackgroundColor,
+                ShowTableBorder = defaults.ShowTableBorder,
                 Font = fontDialog1.Font.Name,
                 FontSize = (int)Math.Round(fontDialog1.Font.Size)
             };

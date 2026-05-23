@@ -28,6 +28,9 @@ namespace GenerateHighlightContent
 
         public Color HighlightColor { get; set; }
 
+        /// <summary> Whether the OneNote table border is shown. Preview-only; ignored by highlight.exe. </summary>
+        public bool ShowTableBorder { get; set; }
+
         public string Font { get; set; }
 
         public int FontSize { get; set; }

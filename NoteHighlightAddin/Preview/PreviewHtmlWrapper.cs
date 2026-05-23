@@ -22,8 +22,20 @@ namespace NoteHighlightAddin.Preview
         /// <c>background-color</c> declaration from the first <c>&lt;pre&gt;</c>
         /// tag when <paramref name="darkMode"/> is true so dark themes render
         /// with correct contrast.
+        /// <para>
+        /// To mirror the real OneNote insertion, <paramref name="boxColor"/> is
+        /// applied as the background of the container that holds the code block
+        /// (the equivalent of the OneNote cell <c>shadingColor</c>), so it shows
+        /// as the surround around the <c>&lt;pre&gt;</c> rather than over the code
+        /// text - the <c>&lt;pre&gt;</c> keeps its own theme background on top. A
+        /// null <paramref name="boxColor"/>, or one whose alpha byte is 0
+        /// (transparent, the OneNote <c>"none"</c> case), leaves the default white
+        /// surround. When <paramref name="showTableBorder"/> is true a 1px solid
+        /// neutral grey border is drawn around that container, matching OneNote's
+        /// default cell border.
+        /// </para>
         /// </summary>
-        public static string Wrap(string highlightOutputHtml, bool darkMode, Color? formBackground)
+        public static string Wrap(string highlightOutputHtml, bool darkMode, Color? boxColor, bool showTableBorder)
         {
             string html = XmlPrologRegex.Replace(highlightOutputHtml ?? string.Empty, string.Empty);
 
@@ -47,14 +59,24 @@ namespace NoteHighlightAddin.Preview
             sb.Append("<!DOCTYPE html><html><head>");
             sb.Append("<meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">");
             sb.Append("<style>html,body { margin:0; padding:8px; overflow:auto; }");
-            if (formBackground.HasValue)
+
+            sb.Append(".nh-preview-box { padding:4px;");
+            if (boxColor.HasValue && boxColor.Value.A != 0)
             {
-                Color c = formBackground.Value;
+                Color c = boxColor.Value;
                 string hex = string.Format("#{0:X2}{1:X2}{2:X2}", c.R, c.G, c.B);
-                sb.Append("body { background:").Append(hex).Append("; }");
+                sb.Append(" background:").Append(hex).Append(";");
             }
+            if (showTableBorder)
+            {
+                sb.Append(" border:1px solid #A6A6A6;");
+            }
+            sb.Append(" }");
+
             sb.Append("</style></head><body>");
+            sb.Append("<div class=\"nh-preview-box\">");
             sb.Append(html);
+            sb.Append("</div>");
             sb.Append("</body></html>");
             return sb.ToString();
         }
