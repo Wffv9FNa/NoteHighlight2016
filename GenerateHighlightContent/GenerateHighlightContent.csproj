@@ -81,11 +81,32 @@
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it.
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">
   </Target>
   <Target Name="AfterBuild">
   </Target>
   -->
+  <!--
+    RefreshGacAfterBuild: GenerateHighlightContent is strong-named (SignAssembly), so when it
+    is present in the GAC the CLR ALWAYS binds the GAC copy in preference to the local bin copy.
+    The OneNote COM add-in loads NoteHighlightAddin.dll by path (registry CodeBase, not strong-named)
+    from bin\Debug, but resolves its GenerateHighlightContent dependency from the GAC. If the GAC
+    holds an older build (same AssemblyVersion 2.7.0.0, never bumped), the fresh local build is
+    silently shadowed and OneNote raises MissingMethodException for any newly added member
+    (e.g. set_ShowTableBorder). See memory: feedback_com_addin_path_traps. This step keeps the
+    GAC copy in lockstep with each Debug build. It requires admin - the Debug|AnyCPU dev loop
+    already builds elevated for RegisterForComInterop - and degrades to a warning otherwise so a
+    non-elevated build still succeeds.
+  -->
+  <Target Name="RefreshGacAfterBuild" AfterTargets="Build" Condition=" '$(Configuration)' == 'Debug' ">
+    <PropertyGroup>
+      <GacUtilExe Condition=" '$(GacUtilExe)' == '' AND Exists('$(MSBuildProgramFiles32)\Microsoft SDKs\Windows\v10.0A\bin\NETFX 4.8 Tools\x64\gacutil.exe') ">$(MSBuildProgramFiles32)\Microsoft SDKs\Windows\v10.0A\bin\NETFX 4.8 Tools\x64\gacutil.exe</GacUtilExe>
+      <GacUtilExe Condition=" '$(GacUtilExe)' == '' AND Exists('$(MSBuildProgramFiles32)\Microsoft SDKs\Windows\v10.0A\bin\NETFX 4.8 Tools\gacutil.exe') ">$(MSBuildProgramFiles32)\Microsoft SDKs\Windows\v10.0A\bin\NETFX 4.8 Tools\gacutil.exe</GacUtilExe>
+      <GacUtilExe Condition=" '$(GacUtilExe)' == '' AND Exists('$(MSBuildProgramFiles32)\Microsoft SDKs\Windows\v10.0A\bin\NETFX 4.8.1 Tools\x64\gacutil.exe') ">$(MSBuildProgramFiles32)\Microsoft SDKs\Windows\v10.0A\bin\NETFX 4.8.1 Tools\x64\gacutil.exe</GacUtilExe>
+    </PropertyGroup>
+    <Warning Condition=" '$(GacUtilExe)' == '' " Text="gacutil.exe not found; the GAC copy of $(TargetName) was not refreshed. If OneNote loads a stale GenerateHighlightContent, install the freshly built DLL with 'gacutil /f /i &quot;$(TargetPath)&quot;' from an elevated prompt." />
+    <Exec Condition=" '$(GacUtilExe)' != '' " Command="&quot;$(GacUtilExe)&quot; /nologo /f /i &quot;$(TargetPath)&quot;" ContinueOnError="true" />
+  </Target>
 </Project>
