@@ -49,6 +49,17 @@ namespace NoteHighlightAddin
         /// </summary>
         private bool _suppressSplitterPersist;
 
+        /// <summary>
+        /// False until MainForm_Shown has finished its startup sizing. The form opens
+        /// proportional to the monitor work area, and with FixedPanel.None that resize
+        /// makes the SplitContainer rescale the splitter to its designer ratio and fire
+        /// SplitterMoved before the saved distance is applied. Persisting that transient
+        /// value would overwrite the user's saved split (and resurrect the old default)
+        /// on every launch, so SplitContainer_SplitterMoved ignores moves until the form
+        /// is settled and only genuine user drags are saved thereafter.
+        /// </summary>
+        private bool _splitterReady;
+
         #endregion
 
         #region -- Constructor --
@@ -92,7 +103,7 @@ namespace NoteHighlightAddin
             if (width <= 0) return;
 
             int percent = NoteHighlightForm.Properties.Settings.Default.MainFormPreviewSplitter;
-            if (percent <= 0 || percent >= 100) percent = 60;
+            if (percent <= 0 || percent >= 100) percent = 50;
 
             int desired = (int)Math.Round(width * (percent / 100.0));
 
@@ -118,6 +129,7 @@ namespace NoteHighlightAddin
         private void SplitContainer_SplitterMoved(object sender, SplitterEventArgs e)
         {
             if (_suppressSplitterPersist) return;
+            if (!_splitterReady) return;
             if (!this.IsHandleCreated) return;
 
             int width = this.splitContainer.Width;
@@ -426,6 +438,12 @@ namespace NoteHighlightAddin
                 }
 
                 this.BeginInvoke(new Action(SchedulePreview));
+
+                // Arm splitter persistence only after the startup resize/layout has
+                // settled. Queued behind SchedulePreview so any resize-induced
+                // SplitterMoved from the proportional sizing above is ignored; from
+                // here on only genuine user drags are written to user.config.
+                this.BeginInvoke(new Action(() => _splitterReady = true));
             }
 
         }

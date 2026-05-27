@@ -21,7 +21,7 @@
       <Value Profile="(Default)">True</Value>
     </Setting>
     <Setting Name="MainFormPreviewSplitter" Type="System.Int32" Scope="User">
-      <Value Profile="(Default)">60</Value>
+      <Value Profile="(Default)">50</Value>
     </Setting>
     <Setting Name="SettingsFormPreviewSplitter" Type="System.Int32" Scope="User">
       <Value Profile="(Default)">60</Value>
