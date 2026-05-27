@@ -83,6 +83,21 @@ namespace UnitTesting
         }
 
         [TestMethod]
+        public void Wrap_EmitsNonWrappingRuleForCodePre()
+        {
+            // The preview must mirror OneNote insertion: long lines scroll
+            // horizontally rather than reflowing, so Wrap must emit an explicit
+            // non-wrapping white-space rule for the code <pre>.
+            string output = PreviewHtmlWrapper.Wrap("<pre>code</pre>", false, null, false);
+
+            // Must be !important: highlight.exe --inline-css emits the <pre> with an
+            // inline "white-space: pre-wrap;", which outranks a plain type-selector rule.
+            Assert.IsTrue(
+                output.IndexOf("pre { white-space:pre !important;", StringComparison.Ordinal) >= 0,
+                "Wrap must emit a non-wrapping white-space:pre !important rule to override highlight.exe's inline pre-wrap.");
+        }
+
+        [TestMethod]
         [ExpectedException(typeof(ArgumentOutOfRangeException))]
         public void StripPreBackgroundColor_ThrowsOnMissingSemicolon()
         {

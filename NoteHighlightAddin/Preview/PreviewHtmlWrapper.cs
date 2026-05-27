@@ -59,6 +59,15 @@ namespace NoteHighlightAddin.Preview
             sb.Append("<!DOCTYPE html><html><head>");
             sb.Append("<meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">");
             sb.Append("<style>html,body { margin:0; padding:8px; overflow:auto; }");
+            // Force the code block to never reflow: long lines scroll horizontally
+            // (html,body overflow:auto supplies the scrollbar) so the preview mirrors
+            // how the code is inserted rather than word-wrapping. highlight.exe with
+            // --inline-css emits the <pre> with an inline "white-space: pre-wrap;", and
+            // an inline declaration outranks a plain type-selector rule - so !important
+            // is required here to override it (an important author rule beats a normal
+            // inline declaration). It does not depend on highlight.exe's exact spacing,
+            // unlike rewriting the inline string would.
+            sb.Append("pre { white-space:pre !important; word-wrap:normal !important; overflow-wrap:normal !important; }");
 
             sb.Append(".nh-preview-box { padding:4px;");
             if (boxColor.HasValue && boxColor.Value.A != 0)
