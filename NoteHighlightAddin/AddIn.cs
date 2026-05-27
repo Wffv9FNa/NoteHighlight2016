@@ -937,20 +937,6 @@ namespace NoteHighlightAddin
         }
 
 
-        public bool cbDarkMode_GetPressed(IRibbonControl control)
-        {
-            this.DarkMode = NoteHighlightForm.Properties.Settings.Default.DarkMode;
-            return this.DarkMode;
-        }
-
-        public void cbDarkMode_OnAction(IRibbonControl control, bool isPressed)
-        {
-            ObservePendingInvalidate();
-            this.DarkMode = isPressed;
-            NoteHighlightForm.Properties.Settings.Default.DarkMode = this.DarkMode;
-            SettingsHelper.SafeSave();
-        }
-
         /// <summary>
         /// Lazily construct the main-worker filter+thread on first use. Called only from the main
         /// STA (ribbon callback), which Office serialises - a plain null-check is therefore enough.
@@ -1077,7 +1063,7 @@ namespace NoteHighlightAddin
                 MainForm form;
                 try
                 {
-                    form = new MainForm(tag, outFileName, selectedText, this.QuickStyle, this.DarkMode);
+                    form = new MainForm(tag, outFileName, selectedText, this.QuickStyle, NoteHighlightForm.Properties.Settings.Default.DarkMode);
                 }
                 catch (Exception ex)
                 {
@@ -1100,6 +1086,11 @@ namespace NoteHighlightAddin
                 {
                     _currentMainForm = null;
                 }
+
+                // The Dark Mode toggle now lives on MainForm, not the ribbon. Propagate the
+                // user's choice back to the add-in instance so PrepareFormatedContent strips
+                // the <pre> background-color for the inserted output, matching the preview.
+                this.DarkMode = form.DarkMode;
 
                 if (File.Exists(htmlOutputPath))
                 {

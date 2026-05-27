@@ -35,6 +35,7 @@
             this.cbx_Clipboard = new System.Windows.Forms.CheckBox();
             this.cbx_lineNumber = new System.Windows.Forms.CheckBox();
             this.cbx_tableBorder = new System.Windows.Forms.CheckBox();
+            this.cbx_darkMode = new System.Windows.Forms.CheckBox();
             this.txtCode = new ICSharpCode.TextEditor.TextEditorControl();
             this.folderBrowserDialog1 = new System.Windows.Forms.FolderBrowserDialog();
             this.panel1 = new System.Windows.Forms.Panel();
@@ -128,6 +129,16 @@
             this.cbx_tableBorder.Text = "Show Table Border(&B)";
             this.cbx_tableBorder.UseVisualStyleBackColor = true;
             //
+            // cbx_darkMode
+            //
+            this.cbx_darkMode.AutoSize = true;
+            this.cbx_darkMode.Location = new System.Drawing.Point(405, 44);
+            this.cbx_darkMode.Name = "cbx_darkMode";
+            this.cbx_darkMode.Size = new System.Drawing.Size(82, 17);
+            this.cbx_darkMode.TabIndex = 4;
+            this.cbx_darkMode.Text = "Dark Mode(&D)";
+            this.cbx_darkMode.UseVisualStyleBackColor = true;
+            //
             // txtCode
             // 
             this.txtCode.AutoScroll = true;
@@ -140,6 +151,7 @@
             // 
             // panel1
             // 
+            this.panel1.Controls.Add(this.cbx_darkMode);
             this.panel1.Controls.Add(this.cbx_tableBorder);
             this.panel1.Controls.Add(this.cbx_lineNumber);
             this.panel1.Controls.Add(this.cbx_Clipboard);
@@ -281,6 +293,7 @@
         private System.Windows.Forms.Button btnCodeHighLight;
         private System.Windows.Forms.CheckBox cbx_lineNumber;
         private System.Windows.Forms.CheckBox cbx_tableBorder;
+        private System.Windows.Forms.CheckBox cbx_darkMode;
         private System.Windows.Forms.Label label1;
         private System.Windows.Forms.CheckBox cbx_Clipboard;
         private System.Windows.Forms.FolderBrowserDialog folderBrowserDialog1;

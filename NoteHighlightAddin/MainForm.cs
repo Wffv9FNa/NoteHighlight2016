@@ -40,7 +40,7 @@ namespace NoteHighlightAddin
 
         private readonly bool _quickStyle;
 
-        public bool DarkMode => _darkMode;
+        public bool DarkMode => this.cbx_darkMode.Checked;
 
         /// <summary>
         /// Set while the splitter is being positioned programmatically (initial load,
@@ -86,6 +86,7 @@ namespace NoteHighlightAddin
             this.cbx_style.SelectedIndexChanged += (s, e) => SchedulePreview();
             this.cbx_lineNumber.CheckedChanged += (s, e) => SchedulePreview();
             this.cbx_tableBorder.CheckedChanged += (s, e) => SchedulePreview();
+            this.cbx_darkMode.CheckedChanged += (s, e) => SchedulePreview();
             this.btnBackground.BackColorChanged += (s, e) => SchedulePreview();
 
             this.splitContainer.SplitterMoved += SplitContainer_SplitterMoved;
@@ -213,6 +214,7 @@ namespace NoteHighlightAddin
             this.cbx_Clipboard.Checked = NoteHighlightForm.Properties.Settings.Default.SaveOnClipboard;
             this.cbx_lineNumber.Checked = NoteHighlightForm.Properties.Settings.Default.ShowLineNumber;
             this.cbx_tableBorder.Checked = NoteHighlightForm.Properties.Settings.Default.ShowTableBorder;
+            this.cbx_darkMode.Checked = _darkMode;
         }
 
         /// <summary>
@@ -393,6 +395,7 @@ namespace NoteHighlightAddin
             defaultSettings.ShowLineNumber = this.cbx_lineNumber.Checked;
             defaultSettings.SaveOnClipboard = this.cbx_Clipboard.Checked;
             defaultSettings.ShowTableBorder = this.cbx_tableBorder.Checked;
+            defaultSettings.DarkMode = this.cbx_darkMode.Checked;
             defaultSettings.HighLightStyle = this.cbx_style.SelectedIndex;
             defaultSettings.BackgroundColor = this.btnBackground.BackColor;
             SettingsHelper.SafeSave();
