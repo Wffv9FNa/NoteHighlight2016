@@ -407,6 +407,18 @@ namespace NoteHighlightAddin
 
                 NativeMethods.SetForegroundWindow(this.Handle);
 
+                // Open proportionally to the active monitor's work area (the screen the
+                // cursor is on), clamped to MinimumSize so the form never collapses on a
+                // small/low-res display. CenterScreen does not re-centre after a post-Shown
+                // resize, so place the form manually at the centre of that work area.
+                Rectangle workArea = Screen.FromPoint(Cursor.Position).WorkingArea;
+                int targetWidth = Math.Max(this.MinimumSize.Width, (int)(workArea.Width * 0.70));
+                int targetHeight = Math.Max(this.MinimumSize.Height, (int)(workArea.Height * 0.75));
+                this.Size = new Size(targetWidth, targetHeight);
+                this.Location = new Point(
+                    workArea.Left + (workArea.Width - this.Width) / 2,
+                    workArea.Top + (workArea.Height - this.Height) / 2);
+
                 ApplySavedPreviewVisibility();
                 if (!this.splitContainer.Panel2Collapsed)
                 {
