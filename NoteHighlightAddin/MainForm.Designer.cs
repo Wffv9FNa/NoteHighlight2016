@@ -32,6 +32,7 @@
             this.btnCodeHighLight = new System.Windows.Forms.Button();
             this.label1 = new System.Windows.Forms.Label();
             this.cbx_style = new System.Windows.Forms.ComboBox();
+            this.btnBrowseAll = new System.Windows.Forms.Button();
             this.cbx_Clipboard = new System.Windows.Forms.CheckBox();
             this.cbx_lineNumber = new System.Windows.Forms.CheckBox();
             this.cbx_tableBorder = new System.Windows.Forms.CheckBox();
@@ -87,9 +88,19 @@
             this.cbx_style.Name = "cbx_style";
             this.cbx_style.Size = new System.Drawing.Size(121, 21);
             this.cbx_style.TabIndex = 0;
-            // 
+            //
+            // btnBrowseAll
+            //
+            this.btnBrowseAll.Location = new System.Drawing.Point(201, 16);
+            this.btnBrowseAll.Name = "btnBrowseAll";
+            this.btnBrowseAll.Size = new System.Drawing.Size(64, 23);
+            this.btnBrowseAll.TabIndex = 5;
+            this.btnBrowseAll.Text = "Browse all...";
+            this.btnBrowseAll.UseVisualStyleBackColor = true;
+            this.btnBrowseAll.Click += new System.EventHandler(this.btnBrowseAll_Click);
+            //
             // cbx_Clipboard
-            // 
+            //
             this.cbx_Clipboard.AutoSize = true;
             settings1.BackgroundColor = System.Drawing.Color.White;
             settings1.HighLightStyle = 0;
@@ -155,6 +166,7 @@
             this.panel1.Controls.Add(this.cbx_tableBorder);
             this.panel1.Controls.Add(this.cbx_lineNumber);
             this.panel1.Controls.Add(this.cbx_Clipboard);
+            this.panel1.Controls.Add(this.btnBrowseAll);
             this.panel1.Controls.Add(this.cbx_style);
             this.panel1.Controls.Add(this.label1);
             this.panel1.Dock = System.Windows.Forms.DockStyle.Top;
@@ -298,6 +310,7 @@
         private System.Windows.Forms.CheckBox cbx_Clipboard;
         private System.Windows.Forms.FolderBrowserDialog folderBrowserDialog1;
         private System.Windows.Forms.ComboBox cbx_style;
+        private System.Windows.Forms.Button btnBrowseAll;
         private ICSharpCode.TextEditor.TextEditorControl txtCode;
         private System.Windows.Forms.Panel panel1;
         private System.Windows.Forms.Panel panel2;

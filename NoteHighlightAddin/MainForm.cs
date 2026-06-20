@@ -151,20 +151,27 @@ namespace NoteHighlightAddin
             if (_quickStyle) return;
             if (_previewPane == null) return;
 
-            var parameters = new HighLightParameter()
+            _previewPane.Render(BuildPreviewParameter(CodeStyle), this.DarkMode);
+        }
+
+        /// <summary>
+        /// Builds the preview parameter from current form state, varying only the
+        /// theme, so the live pane and the gallery render identically and cannot drift.
+        /// </summary>
+        public HighLightParameter BuildPreviewParameter(string highLightStyle)
+        {
+            return new HighLightParameter()
             {
                 FileName = _fileName,
                 Content = CodeContent,
                 CodeType = _codeType,
-                HighLightStyle = CodeStyle,
+                HighLightStyle = highLightStyle,
                 ShowLineNumber = IsShowLineNumber,
                 HighlightColor = BackgroundColor,
                 ShowTableBorder = this.cbx_tableBorder.Checked,
                 Font = NoteHighlightForm.Properties.Settings.Default.Font,
                 FontSize = NoteHighlightForm.Properties.Settings.Default.FontSize
             };
-
-            _previewPane.Render(parameters, this.DarkMode);
         }
 
         private void LoadThemes()
@@ -404,7 +411,16 @@ namespace NoteHighlightAddin
         private void btnBackground_Click(object sender, EventArgs e)
         {
             contextMenuStrip1.Show(btnBackground, new Point(0, btnBackground.Height));
-            
+
+        }
+
+        private void btnBrowseAll_Click(object sender, EventArgs e)
+        {
+            // ShowDialog on this STA: MainForm is ownerless but a dialog launched from it has a valid owner.
+            using (var gallery = new GalleryForm(this, this.cbx_style, this.DarkMode, this.BackgroundColor, this.cbx_tableBorder.Checked))
+            {
+                gallery.ShowDialog(this);
+            }
         }
 
         private void MainForm_Shown(object sender, EventArgs e)

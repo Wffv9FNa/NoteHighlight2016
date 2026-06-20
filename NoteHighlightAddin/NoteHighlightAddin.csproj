@@ -150,6 +150,12 @@
       <DependentUpon>PreviewPane.cs</DependentUpon>
     </Compile>
     <Compile Include="Preview\PreviewHtmlWrapper.cs" />
+    <Compile Include="Preview\GalleryForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Preview\GalleryForm.Designer.cs">
+      <DependentUpon>GalleryForm.cs</DependentUpon>
+    </Compile>
   </ItemGroup>
   <ItemGroup>
     <Content Include="highlight\highlight.exe">
