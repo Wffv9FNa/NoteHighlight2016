@@ -277,8 +277,7 @@ namespace NoteHighlightAddin
 
                     if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(tag))
                     {
-                        // Slot buttons (slotLangNN) legitimately have no tag - they are not
-                        // languages; see .local/plans/2026-05-14-pinned-language-ribbon-ordering.md
+                        // Slot buttons (slotLangNN) legitimately have no tag - they are not languages.
                         if (id == null || !id.StartsWith("slotLang", StringComparison.Ordinal))
                             Trace.TraceWarning("NoteHighlight2016: skipping ribbon button without id/tag (id='" + (id ?? "") + "', tag='" + (tag ?? "") + "').");
                         continue;

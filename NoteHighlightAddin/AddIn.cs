@@ -338,7 +338,7 @@ namespace NoteHighlightAddin
 			if (ConnectMode == ext_ConnectMode.ext_cm_UISetup)
 				return;
 
-			// MUST subscribe before the first ConfigurationManager.GetSection("HighLightSection") call (MainForm.LoadThemes, SettingsForm, PreviewPane, etc). Under COM activation the AppDomain's AppBase is OneNote's Office16 directory, not the add-in's bin folder, so Fusion's partial-name probe (Type.GetType -> Assembly.Load) cannot locate GenerateHighlightContent.dll on its own. Eager Assembly.LoadFrom does NOT fix this because LoadFrom-context assemblies are invisible to the Load-context partial-name lookup; AssemblyResolve is the canonical workaround because the assembly it returns is treated as if Fusion had resolved it itself. Do NOT move config-section access into a type initialiser that runs before OnConnection - that re-introduces the partial-binding regression. See .local/plans/fix-broken-roundtrip-tests.md Option E.
+			// MUST subscribe before the first ConfigurationManager.GetSection("HighLightSection") call (MainForm.LoadThemes, SettingsForm, PreviewPane, etc). Under COM activation the AppDomain's AppBase is OneNote's Office16 directory, not the add-in's bin folder, so Fusion's partial-name probe (Type.GetType -> Assembly.Load) cannot locate GenerateHighlightContent.dll on its own. Eager Assembly.LoadFrom does NOT fix this because LoadFrom-context assemblies are invisible to the Load-context partial-name lookup; AssemblyResolve is the canonical workaround because the assembly it returns is treated as if Fusion had resolved it itself. Do NOT move config-section access into a type initialiser that runs before OnConnection - that re-introduces the partial-binding regression.
 			try
 			{
 				if (!_assemblyResolveSubscribed)
